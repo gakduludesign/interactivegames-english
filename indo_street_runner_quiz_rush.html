@@ -1,0 +1,2855 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Indo Street Runner: Quiz Rush 3D</title>
+  <!-- Tailwind CSS untuk UI modern & responsif -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Three.js untuk grafis 3D/2.5D ala Subway Surfers -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- Google Fonts: Plus Jakarta Sans & Fredoka untuk nuansa game arcade ceria -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #0f172a;
+    }
+    .font-game {
+      font-family: 'Fredoka', cursive, sans-serif;
+    }
+    #game-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      z-index: 1;
+    }
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.78);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+    }
+    .glass-light {
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(12px);
+      border: 2px solid rgba(255, 255, 255, 0.9);
+      box-shadow: 0 20px 45px rgba(15, 23, 42, 0.35);
+    }
+    .btn-arcade {
+      transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s ease;
+    }
+    .btn-arcade:hover {
+      transform: translateY(-2px) scale(1.02);
+    }
+    .btn-arcade:active {
+      transform: translateY(2px) scale(0.98);
+    }
+    /* Custom scrollbar untuk modal editor 30 soal */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.3);
+      border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(245, 158, 11, 0.7);
+      border-radius: 999px;
+    }
+    @keyframes floatSlow {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-6px); }
+    }
+    .animate-float {
+      animation: floatSlow 3s ease-in-out infinite;
+    }
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 18px rgba(251, 191, 36, 0.45); }
+      50% { box-shadow: 0 0 32px rgba(251, 191, 36, 0.85); }
+    }
+    .glow-gold {
+      animation: pulseGlow 2s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body class="text-white">
+
+  <!-- Kanvas 3D Utama -->
+  <canvas id="game-canvas"></canvas>
+
+  <!-- ========================================================= -->
+  <!-- 1. HUD SAAT BERMAIN (Skor, Nyawa, Progress 30 Soal, Audio) -->
+  <!-- ========================================================= -->
+  <div id="hud-overlay" class="hidden fixed inset-0 z-10 pointer-events-none flex flex-col justify-between p-3 sm:p-5">
+    <!-- Baris Atas HUD -->
+    <div class="flex flex-wrap items-start justify-between gap-2">
+      <!-- Info Pemain & Nyawa -->
+      <div class="glass-panel rounded-2xl px-3.5 py-2.5 flex items-center gap-3 pointer-events-auto">
+        <div id="hud-avatar-badge" class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-xl shadow-md">
+          👦🏽
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span id="hud-username" class="font-bold text-sm sm:text-base text-white truncate max-w-[120px] sm:max-w-[160px]">Player</span>
+            <span id="hud-char-label" class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/15 text-amber-300">Cowok</span>
+          </div>
+          <!-- Nyawa (Hati) -->
+          <div id="hud-hearts" class="flex items-center gap-1 mt-0.5 text-base sm:text-lg" aria-label="Nyawa">
+            ❤️ ❤️ ❤️
+          </div>
+        </div>
+      </div>
+
+      <!-- Progress Kuis (Buku Soal Terkumpul dari 30) -->
+      <div class="glass-panel rounded-2xl px-4 py-2.5 flex flex-col items-center min-w-[155px] sm:min-w-[205px]">
+        <div class="text-[11px] uppercase tracking-wider text-amber-300 font-bold flex items-center gap-1">
+          <span>📘</span> BUKU KUIS INGGRIS
+        </div>
+        <div class="font-game text-lg sm:text-xl text-white">
+          Soal <span id="hud-quiz-progress" class="text-amber-400">0</span> / <span id="hud-quiz-total">30</span>
+        </div>
+        <div class="w-full h-1.5 bg-slate-700 rounded-full overflow-hidden mt-1">
+          <div id="hud-quiz-bar" class="h-full bg-gradient-to-r from-emerald-400 to-amber-400 transition-all duration-300" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- Skor, Koin & Tombol Kontrol Audio/Pause -->
+      <div class="flex items-center gap-2 pointer-events-auto">
+        <div class="glass-panel rounded-2xl px-3.5 py-2 text-right">
+          <div class="text-[11px] uppercase tracking-wider text-slate-300 font-semibold">Skor</div>
+          <div id="hud-score" class="font-game text-lg sm:text-2xl text-white leading-tight">0</div>
+          <div class="text-xs font-bold text-amber-400 flex items-center justify-end gap-1">
+            <span>🪙</span> <span id="hud-coins">0</span>
+          </div>
+        </div>
+
+        <button id="btn-toggle-sound" title="Suara On/Off" class="glass-panel btn-arcade w-11 h-11 rounded-2xl flex items-center justify-center text-lg hover:bg-white/15 cursor-pointer">
+          🔊
+        </button>
+        <button id="btn-pause-game" title="Jeda / Menu" class="glass-panel btn-arcade w-11 h-11 rounded-2xl flex items-center justify-center text-lg hover:bg-white/15 cursor-pointer">
+          ⏸️
+        </button>
+      </div>
+    </div>
+
+    <!-- Indikator Status Power-Up / Shield / Petunjuk Kontrol -->
+    <div class="flex flex-col items-center gap-2">
+      <div id="hud-status-banner" class="hidden glass-panel px-4 py-1.5 rounded-full text-xs sm:text-sm font-bold text-emerald-300 border border-emerald-400/40 shadow-lg">
+        🛡️ Perisai Kebal Aktif!
+      </div>
+      <!-- Tombol Sentuh Bawah Khusus Layar Kecil / Akses Cepat -->
+      <div class="sm:hidden flex items-center justify-center gap-3 pointer-events-auto pb-1 opacity-85">
+        <button id="touch-left" class="glass-panel w-12 h-12 rounded-2xl flex items-center justify-center text-xl active:bg-amber-500/40">⬅️</button>
+        <button id="touch-up" class="glass-panel w-12 h-12 rounded-2xl flex items-center justify-center text-xl active:bg-amber-500/40">⬆️</button>
+        <button id="touch-down" class="glass-panel w-12 h-12 rounded-2xl flex items-center justify-center text-xl active:bg-amber-500/40">⬇️</button>
+        <button id="touch-right" class="glass-panel w-12 h-12 rounded-2xl flex items-center justify-center text-xl active:bg-amber-500/40">➡️</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Overlay Hitung Mundur 3 - 2 - 1 Setelah Selesai Menjawab Kuis -->
+  <div id="countdown-overlay" class="hidden fixed inset-0 z-25 pointer-events-none flex items-center justify-center bg-slate-950/30 backdrop-blur-[2px]">
+    <div class="glass-panel px-10 py-6 rounded-3xl text-center border-2 border-amber-400/60 shadow-2xl">
+      <div class="text-xs uppercase tracking-widest text-amber-300 font-bold mb-1">Siap Lari Kembali!</div>
+      <div id="countdown-number" class="font-game text-6xl sm:text-7xl text-white drop-shadow">3</div>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- 2. HOME PAGE / HALAMAN UTAMA (MODE PEMAIN MURNI)          -->
+  <!-- ========================================================= -->
+  <div id="home-screen" class="fixed inset-0 z-20 flex items-center justify-center p-3 sm:p-6 bg-gradient-to-b from-slate-950/55 via-slate-900/45 to-slate-950/75 overflow-y-auto">
+    <div class="glass-panel w-full max-w-2xl rounded-3xl p-5 sm:p-7 my-auto border border-white/20">
+      <!-- Header Judul Game -->
+      <div class="text-center mb-5">
+        <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-red-600/30 border border-red-400/45 text-red-100 text-xs font-bold tracking-wide mb-2">
+          <span>🇮🇩</span> JALANAN KOTA INDONESIA • GRADE 12 ENGLISH EDITION
+        </div>
+        <h1 class="font-game text-3xl sm:text-5xl tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-orange-400 to-red-400 drop-shadow">
+          INDO STREET RUNNER
+        </h1>
+        <p class="text-slate-200 text-xs sm:text-sm mt-1">
+          Hindari Motor, Mobil, Bus, Truk & Mobil MBG, lalu kumpulkan <strong class="text-amber-300">Item Buku Kuis (30 Soal Bahasa Inggris Kelas 12)</strong>!
+        </p>
+      </div>
+
+      <!-- Form Input Username -->
+      <div class="mb-5">
+        <label for="input-username" class="block text-xs font-bold uppercase tracking-wider text-amber-300 mb-1.5">
+          Masukkan Username Kamu
+        </label>
+        <div class="relative">
+          <span class="absolute inset-y-0 left-3.5 flex items-center text-lg">🏷️</span>
+          <input
+            id="input-username"
+            type="text"
+            maxlength="18"
+            placeholder="Contoh: Dimas_XII / Alya_SMA..."
+            class="w-full pl-11 pr-4 py-3 rounded-2xl bg-slate-900/85 border-2 border-slate-700 focus:border-amber-400 focus:outline-none text-white font-bold text-sm sm:text-base placeholder-slate-500 transition"
+          />
+        </div>
+        <p id="username-error" class="hidden text-xs text-rose-400 font-semibold mt-1">
+          ⚠️ Isi username dulu ya sebelum mulai berlari!
+        </p>
+      </div>
+
+      <!-- Pilihan 2 Karakter (Cowok & Cewek) -->
+      <div class="mb-6">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-bold uppercase tracking-wider text-amber-300">Pilih Karakter Pelari SMA</span>
+          <span class="text-xs text-slate-300">Karakter 3D tampil di jalanan</span>
+        </div>
+        <div class="grid grid-cols-2 gap-3 sm:gap-4">
+          <!-- Kartu Karakter Cowok -->
+          <button
+            type="button"
+            id="select-char-cowok"
+            data-char="cowok"
+            class="char-card btn-arcade relative rounded-2xl p-3.5 sm:p-4 text-left border-2 border-amber-400 bg-gradient-to-br from-sky-500/25 to-blue-700/25 transition cursor-pointer"
+          >
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-3xl sm:text-4xl">👦🏽</span>
+              <span class="char-badge px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-400 text-slate-950">DIPILIH</span>
+            </div>
+            <div class="font-game text-base sm:text-lg text-white">Pelajar Cowok</div>
+            <div class="text-xs text-slate-300 mt-0.5">Seragam Putih Abu & Ransel Merah</div>
+          </button>
+
+          <!-- Kartu Karakter Cewek -->
+          <button
+            type="button"
+            id="select-char-cewek"
+            data-char="cewek"
+            class="char-card btn-arcade relative rounded-2xl p-3.5 sm:p-4 text-left border-2 border-white/15 bg-slate-800/60 hover:border-pink-400/60 transition cursor-pointer"
+          >
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-3xl sm:text-4xl">👧🏽</span>
+              <span class="char-badge hidden px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-pink-400 text-slate-950">DIPILIH</span>
+            </div>
+            <div class="font-game text-base sm:text-lg text-white">Pelajar Cewek</div>
+            <div class="text-xs text-slate-300 mt-0.5">Seragam Putih Abu, Kuncir & Ransel Kuning</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tombol Aksi Utama (Fokus Pemain) -->
+      <div class="flex flex-col sm:flex-row gap-3">
+        <button
+          id="btn-start-game"
+          class="btn-arcade glow-gold w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-400 via-orange-500 to-red-500 text-slate-950 font-game text-lg sm:text-xl tracking-wide shadow-lg shadow-orange-500/30 flex items-center justify-center gap-2 cursor-pointer"
+        >
+          <span>🚀</span> MULAI BERLARI SEKARANG
+        </button>
+
+        <!-- Tombol Editor Tersembunyi (Hanya muncul jika URL memiliki ?admin=1) -->
+        <button
+          id="btn-open-editor"
+          class="hidden btn-arcade py-3.5 px-5 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-amber-400/40 text-amber-300 font-bold text-sm items-center justify-center gap-2 cursor-pointer"
+        >
+          <span>🔐</span> Admin: Edit 30 Soal (<span id="home-question-count">30</span>)
+        </button>
+      </div>
+
+      <!-- Panduan Singkat & Papan Skor Mini -->
+      <div class="mt-5 pt-4 border-t border-white/10 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-300">
+        <div class="bg-slate-900/65 rounded-xl p-3">
+          <div class="font-bold text-white mb-1">🎮 Cara Bermain:</div>
+          <ul class="space-y-0.5 text-slate-300">
+            <li>• <strong class="text-amber-300">⬅️ ➡️ / A D / Swipe</strong> : Pindah jalur kiri & kanan</li>
+            <li>• <strong class="text-amber-300">⬆️ / W / Spasi</strong> : Lompati motor/mobil</li>
+            <li>• <strong class="text-amber-300">⬇️ / S</strong> : Menunduk / meluncur cepat</li>
+            <li>• <strong class="text-emerald-300">Ambil Item Buku Emas 📘</strong> : Munculkan soal A–E</li>
+          </ul>
+        </div>
+        <div class="bg-slate-900/65 rounded-xl p-3">
+          <div class="font-bold text-white mb-1 flex items-center justify-between">
+            <span>🏆 Rekor Terbaik Pemain</span>
+            <span class="text-[10px] text-amber-300">Top 3</span>
+          </div>
+          <div id="home-leaderboard" class="space-y-1 text-slate-300">
+            <div class="text-slate-500 italic">Belum ada skor tersimpan.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- 3. MODAL KUIS PILIHAN GANDA (OPSI A - E)                  -->
+  <!-- ========================================================= -->
+  <div id="quiz-modal" class="hidden fixed inset-0 z-30 flex items-center justify-center p-3 sm:p-5 bg-slate-950/75 backdrop-blur-sm">
+    <div class="glass-light text-slate-900 w-full max-w-xl rounded-3xl p-5 sm:p-7 shadow-2xl transform transition-all max-h-[92vh] overflow-y-auto">
+      <!-- Header Soal -->
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <div class="flex flex-wrap items-center gap-1.5">
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-900 font-extrabold text-xs">
+            <span>📘</span> GRADE 12 • SOAL <span id="quiz-number">1</span> / <span id="quiz-total-label">30</span>
+          </span>
+          <span id="quiz-difficulty-badge" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">
+            ⭐ EASY (+250)
+          </span>
+        </div>
+        <span id="quiz-topic-badge" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-800">
+          Topic
+        </span>
+      </div>
+
+      <!-- Teks Pertanyaan -->
+      <div class="bg-slate-100 rounded-2xl p-4 mb-4 border border-slate-200">
+        <p id="quiz-question-text" class="font-bold text-sm sm:text-base text-slate-800 leading-relaxed whitespace-pre-line">
+          Pertanyaan akan muncul di sini...
+        </p>
+      </div>
+
+      <!-- 5 Pilihan Jawaban (A, B, C, D, E) -->
+      <div id="quiz-options-container" class="space-y-2">
+        <!-- Diisi secara dinamis oleh JavaScript -->
+      </div>
+
+      <!-- Feedback Jawaban -->
+      <div id="quiz-feedback" class="hidden mt-4 p-3 rounded-2xl text-center font-bold text-xs sm:text-sm"></div>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- 4. MODAL EDITOR ADMIN 30 SOAL (AKSES VIA ?admin=1)        -->
+  <!-- ========================================================= -->
+  <div id="editor-modal" class="hidden fixed inset-0 z-40 flex items-center justify-center p-3 sm:p-5 bg-slate-950/85 backdrop-blur-md">
+    <div class="glass-panel w-full max-w-4xl h-[90vh] rounded-3xl flex flex-col overflow-hidden border border-white/20">
+      <!-- Header Editor -->
+      <div class="p-4 sm:p-5 border-b border-white/15 flex flex-wrap items-center justify-between gap-3 bg-slate-900/90">
+        <div>
+          <h2 class="font-game text-xl sm:text-2xl text-amber-300">🔐 Admin Panel: Edit 30 Soal Bahasa Inggris Kelas 12</h2>
+          <p class="text-xs text-slate-300">Ubah pertanyaan, opsi A–E, atau kunci jawaban. Otomatis tersimpan!</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="btn-export-questions" class="px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold cursor-pointer">
+            📋 Salin JSON Soal
+          </button>
+          <button id="btn-reset-questions" class="px-3 py-2 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-white text-xs font-bold cursor-pointer">
+            🔄 Reset Default (30 Soal)
+          </button>
+          <button id="btn-close-editor" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-extrabold cursor-pointer">
+            ✅ Simpan & Tutup
+          </button>
+        </div>
+      </div>
+
+      <!-- Notifikasi Copy / Save di Editor -->
+      <div id="editor-toast" class="hidden bg-emerald-500/20 border-b border-emerald-400/40 text-emerald-200 text-xs font-bold px-5 py-2 text-center">
+        Perubahan berhasil disimpan!
+      </div>
+
+      <!-- Daftar 30 Soal yang Bisa Diedit Langsung -->
+      <div id="editor-list" class="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+        <!-- Diisi oleh JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- 5. MODAL PAUSE / GAME OVER / MENANG 30 SOAL               -->
+  <!-- ========================================================= -->
+  <div id="end-modal" class="hidden fixed inset-0 z-30 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+    <div class="glass-panel w-full max-w-md rounded-3xl p-6 text-center border border-white/20">
+      <div id="end-icon" class="text-5xl mb-2 animate-float">🏁</div>
+      <h2 id="end-title" class="font-game text-2xl sm:text-3xl text-amber-300">Permainan Selesai!</h2>
+      <p id="end-subtitle" class="text-xs sm:text-sm text-slate-300 mt-1 mb-5">Hebat! Kamu sudah berlari melintasi jalanan kota.</p>
+
+      <!-- Statistik Akhir -->
+      <div class="grid grid-cols-3 gap-2.5 bg-slate-900/75 rounded-2xl p-3.5 mb-5 border border-white/10">
+        <div>
+          <div class="text-[11px] text-slate-400 uppercase font-bold">Skor Akhir</div>
+          <div id="end-score" class="font-game text-xl text-white">0</div>
+        </div>
+        <div>
+          <div class="text-[11px] text-slate-400 uppercase font-bold">Kuis Benar</div>
+          <div id="end-correct" class="font-game text-xl text-emerald-400">0/30</div>
+        </div>
+        <div>
+          <div class="text-[11px] text-slate-400 uppercase font-bold">Koin</div>
+          <div id="end-coins" class="font-game text-xl text-amber-400">0</div>
+        </div>
+      </div>
+
+      <!-- Tombol Aksi -->
+      <div class="flex flex-col gap-2.5">
+        <button id="btn-resume-game" class="hidden btn-arcade w-full py-3 rounded-2xl bg-emerald-500 text-slate-950 font-game text-lg cursor-pointer">
+          ▶️ LANJUTKAN LARI
+        </button>
+        <button id="btn-restart-game" class="btn-arcade w-full py-3 rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 font-game text-lg cursor-pointer">
+          🔄 MAIN LAGI
+        </button>
+        <button id="btn-back-home" class="btn-arcade w-full py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm cursor-pointer">
+          🏠 KEMBALI KE MENU UTAMA
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- SCRIPT UTAMA GAME (3D THREE.JS + 30 SOAL INGGRIS KELAS 12) -->
+  <!-- ========================================================= -->
+  <script>
+    /**
+     * =========================================================================
+     * BANK 30 SOAL BAHASA INGGRIS KELAS 12 SMA (KURIKULUM MERDEKA / UTBK-SNBT)
+     * TINGKAT KESULITAN BERTINGKAT:
+     * - 10 Soal Easy   (+250 Poin)
+     * - 10 Soal Medium (+400 Poin)
+     * - 10 Soal Hard / HOTS (+600 Poin)
+     * ADMIN AREA: Anda bisa langsung mengedit isi array DEFAULT_QUESTIONS di bawah
+     * ini kapan saja untuk mengubah soal, tingkat kesulitan, opsi A–E, maupun kunci.
+     * =========================================================================
+     */
+    const DEFAULT_QUESTIONS = [
+      // ===================== 10 SOAL EASY (MUDAH) =====================
+      {
+        difficulty: "Easy",
+        topic: "Offering Help & Service",
+        question: "Librarian: 'You look like you're carrying too many reference books. _______'\nStudent: 'Oh, thank you! That would be very helpful.'",
+        options: {
+          A: "Why did you take so many books?",
+          B: "Would you like me to help you carry some of them?",
+          C: "You shouldn't borrow more than two books.",
+          D: "Can you put my books back on the shelf?",
+          E: "I don't think you can read all of those."
+        },
+        answer: "B"
+      },
+      {
+        difficulty: "Easy",
+        topic: "Offering Help & Service",
+        question: "Which expression is the most polite way to decline an offer of assistance?",
+        options: {
+          A: "No way, leave me alone right now.",
+          B: "I don't care about your help.",
+          C: "Thank you for offering, but I can manage it myself.",
+          D: "Sure, please do everything for me.",
+          E: "Why are you asking me that?"
+        },
+        answer: "C"
+      },
+      {
+        difficulty: "Easy",
+        topic: "Caption Text",
+        question: "Read the photo caption: 'Small daily habits shape our future success.'\nWhat is the main message of this caption?",
+        options: {
+          A: "Success happens overnight without any effort.",
+          B: "Consistent positive actions lead to future achievements.",
+          C: "Only big events matter in a student's life.",
+          D: "Daily routines make people feel bored.",
+          E: "Future success cannot be planned."
+        },
+        answer: "B"
+      },
+      {
+        difficulty: "Easy",
+        topic: "Caption Text",
+        question: "What is the main purpose of writing a caption under a journalistic photograph?",
+        options: {
+          A: "To entertain readers with a fictional fairy tale",
+          B: "To explain the context and story behind the image",
+          C: "To advertise expensive camera equipment",
+          D: "To replace the entire news article",
+          E: "To criticize the people in the picture"
+        },
+        answer: "B"
+      },
+      {
+        difficulty: "Easy",
+        topic: "Cause and Effect (Basic)",
+        question: "The city traffic was extremely congested this morning _______ a heavy downpour flooded the main intersection.",
+        options: {
+          A: "due to",
+          B: "because",
+          C: "therefore",
+          D: "consequently",
+          E: "so that"
+        },
+        answer: "B"
+      },
+      {
+        difficulty: "Easy",
+        topic: "Cause and Effect (Basic)",
+        question: "Many students arrived late at school _______ the sudden bus strike.",
+        options: {
+          A: "because",
+          B: "since",
+          C: "due to",
+          D: "as a result",
+          E: "although"
+        },
+        answer: "C"
+      },
+      {
+        difficulty: "Easy",
+        topic: "Conditional Sentence Type 1",
+        question: "If Bima _______ his assignment tonight, he _______ free to join the futsal match tomorrow.",
+        options: {
+          A: "finishes / will be",
+          B: "finished / would be",
+          C: "had finished / would have been",
+          D: "finish / was",
+          E: "is finishing / would had been"
+        },
+        answer: "A"
+      },
+      {
+        difficulty: "Easy",
+        topic: "Application Letter (Opening)",
+        question: "Which sentence is most appropriate to open a formal job application letter?",
+        options: {
+          A: "Hey there, I heard your office needs someone cool.",
+          B: "I am writing to express my interest in the Graphic Designer position advertised on your portal.",
+          C: "Give me an interview this Friday because I am the best.",
+          D: "I need a salary soon, so please read my resume.",
+          E: "Tell me if you still have an empty desk in your company."
+        },
+        answer: "B"
+      },
+      {
+        difficulty: "Easy",
+        topic: "Vocabulary in Context",
+        question: "Read the sentence: 'Public transport must be AFFORDABLE so that students and workers can use it every day.'\nThe word 'AFFORDABLE' is closest in meaning to...",
+        options: {
+          A: "Luxurious",
+          B: "Inexpensive",
+          C: "Unreliable",
+          D: "Complicated",
+          E: "Dangerous"
+        },
+        answer: "B"
+      },
+      {
+        difficulty: "Easy",
+        topic: "Relative Pronoun",
+        question: "The vocational student _______ created this 3D city simulation won first prize at the national competition.",
+        options: {
+          A: "whom",
+          B: "whose",
+          C: "which",
+          D: "who",
+          E: "where"
+        },
+        answer: "D"
+      },
+
+      // ===================== 10 SOAL MEDIUM (SEDANG) =====================
+      {
+        difficulty: "Medium",
+        topic: "Application Letter Structure",
+        question: "In which section of an application letter should an applicant highlight their relevant internship experience, technical skills, and how they match the job requirements?",
+        options: {
+          A: "Inside address and salutation",
+          B: "Body paragraph(s)",
+          C: "Complimentary close",
+          D: "Enclosure line",
+          E: "Applicant's signature block"
+        },
+        answer: "B"
+      },
+      {
+        difficulty: "Medium",
+        topic: "News Item Text",
+        question: "Read the news lead: 'BANDUNG — Local high school students have developed a low-cost solar water purifier capable of filtering river water within minutes.'\nWhat is the communicative purpose of this text?",
+        options: {
+          A: "To persuade readers to buy solar panels immediately",
+          B: "To inform readers about a newsworthy student innovation",
+          C: "To instruct readers step-by-step on building a filter",
+          D: "To debate the disadvantages of renewable energy",
+          E: "To retell the writer's personal childhood memory"
+        },
+        answer: "B"
+      },
+      {
+        difficulty: "Medium",
+        topic: "News Item Generic Structure",
+        question: "In a News Item text, statements from eyewitnesses, researchers, or government officials that validate the event are categorized under...",
+        options: {
+          A: "Newsworthy Event",
+          B: "Background Events",
+          C: "Sources",
+          D: "Reiteration",
+          E: "Orientation"
+        },
+        answer: "C"
+      },
+      {
+        difficulty: "Medium",
+        topic: "Passive Voice (Continuous & Perfect)",
+        question: "Look at the construction site! Several smart traffic lights _______ along the main avenue to reduce rush-hour bottlenecks.",
+        options: {
+          A: "are installing",
+          B: "are being installed",
+          C: "were installing",
+          D: "have installed",
+          E: "will install"
+        },
+        answer: "B"
+      },
+      {
+        difficulty: "Medium",
+        topic: "Passive Voice (Modal)",
+        question: "Active: 'The selection committee must verify all scholarship documents before Friday.'\nPassive: 'All scholarship documents _______ by the selection committee before Friday.'",
+        options: {
+          A: "must verified",
+          B: "must be verified",
+          C: "must have verifying",
+          D: "are must verified",
+          E: "must be verify"
+        },
+        answer: "B"
+      },
+      {
+        difficulty: "Medium",
+        topic: "Conditional Sentence Type 2",
+        question: "If Indonesia _______ more high-speed rail networks connecting every province, intercity logistics _______ significantly faster.",
+        options: {
+          A: "has / will become",
+          B: "had / would become",
+          C: "had had / would have become",
+          D: "have / would became",
+          E: "were having / will became"
+        },
+        answer: "B"
+      },
+      {
+        difficulty: "Medium",
+        topic: "Conditional Sentence Type 3",
+        question: "Nadia _______ the scholarship interview yesterday if she _______ her alarm clock the night before.",
+        options: {
+          A: "wouldn't miss / set",
+          B: "won't miss / sets",
+          C: "wouldn't have missed / had set",
+          D: "didn't miss / had set",
+          E: "wouldn't have miss / set"
+        },
+        answer: "C"
+      },
+      {
+        difficulty: "Medium",
+        topic: "Contrastive Conjunctions",
+        question: "_______ the government has expanded electric bus routes, many commuters still rely on private motorcycles for short-distance trips.",
+        options: {
+          A: "Despite",
+          B: "In spite of",
+          C: "Whereas",
+          D: "Although",
+          E: "Nevertheless"
+        },
+        answer: "D"
+      },
+      {
+        difficulty: "Medium",
+        topic: "Conjunctions (Despite vs Nevertheless)",
+        question: "_______ experiencing severe server overload during registration, the university portal remained accessible to all applicants.",
+        options: {
+          A: "Although",
+          B: "Even though",
+          C: "Despite",
+          D: "However",
+          E: "Whereas"
+        },
+        answer: "C"
+      },
+      {
+        difficulty: "Medium",
+        topic: "Reported Speech",
+        question: "Direct: 'We have completed the environmental research project,' the students told their teacher.\nIndirect: The students told their teacher that they _______ the environmental research project.",
+        options: {
+          A: "have completed",
+          B: "had completed",
+          C: "will complete",
+          D: "are completing",
+          E: "complete"
+        },
+        answer: "B"
+      },
+
+      // ===================== 10 SOAL HARD / HOTS (SULIT) =====================
+      {
+        difficulty: "Hard",
+        topic: "HOTS: Analytical Exposition",
+        question: "Read the excerpt: 'Urban vertical farming not only shortens food supply chains but also reduces agricultural water consumption by up to 70 percent. As cities expand rapidly, integrating hydroponic towers into urban architecture is no longer a luxury—it is an ecological necessity.'\nWhich thesis statement best summarizes the author's core argument?",
+        options: {
+          A: "Traditional rural farming should be completely banned in developing nations.",
+          B: "Vertical farming is an essential sustainable solution for growing urban populations.",
+          C: "Hydroponic towers are too expensive for modern city planners to maintain.",
+          D: "Water consumption in cities has decreased without technological intervention.",
+          E: "Urban architecture should prioritize aesthetics over food production."
+        },
+        answer: "B"
+      },
+      {
+        difficulty: "Hard",
+        topic: "HOTS: Hortatory Exposition",
+        question: "Which statement functions as a persuasive 'Recommendation' in a Hortatory Exposition advocating digital privacy among teenagers?",
+        options: {
+          A: "Many social media platforms collect behavioral metadata from users.",
+          B: "A 2025 survey revealed that 68% of teenagers rarely read privacy policies.",
+          C: "Secondly, oversharing personal locations exposes students to cyberstalking.",
+          D: "Therefore, schools ought to integrate data-privacy literacy into their mandatory curriculum.",
+          E: "Data breaches have affected millions of accounts globally over the past decade."
+        },
+        answer: "D"
+      },
+      {
+        difficulty: "Hard",
+        topic: "HOTS: Discussion Text & Implied Attitude",
+        question: "Read the passage: 'Proponents of generative AI in classrooms argue that it personalizes tutoring for every student. Conversely, skeptics warn that over-reliance on automated answers erodes critical thinking. Ultimately, technology amplifies pedagogy only when guided by disciplined human mentorship.'\nWhat is the author's stance on the issue?",
+        options: {
+          A: "Strongly opposed to any use of computers in schools",
+          B: "Unconditionally supportive of replacing teachers with AI",
+          C: "Balanced and conditional, emphasizing human guidance alongside AI",
+          D: "Indifferent toward the future of classroom learning",
+          E: "Skeptical that students can ever develop critical thinking"
+        },
+        answer: "C"
+      },
+      {
+        difficulty: "Hard",
+        topic: "HOTS: Reading Inference & Assumption",
+        question: "Passage: 'Unlike conventional fossil-fuel fleets, electric municipal buses produce zero tailpipe emissions. However, their true carbon footprint depends heavily on whether the regional power grid relies on coal or renewable energy.'\nWhat underlying assumption does the author make?",
+        options: {
+          A: "Electric buses never require maintenance or battery replacement.",
+          B: "Environmental sustainability must be evaluated across the entire energy lifecycle.",
+          C: "Coal-powered electricity is cleaner than diesel fuel.",
+          D: "Municipal buses are the sole cause of urban air pollution.",
+          E: "Renewable energy grids already supply 100% of global electricity."
+        },
+        answer: "B"
+      },
+      {
+        difficulty: "Hard",
+        topic: "HOTS: Conditional Inversion (Type 3)",
+        question: "_______ the coastal mangrove ecosystem been preserved earlier, the devastating tidal erosion could have been significantly minimized.",
+        options: {
+          A: "If",
+          B: "Were",
+          C: "Had",
+          D: "Should",
+          E: "Unless"
+        },
+        answer: "C"
+      },
+      {
+        difficulty: "Hard",
+        topic: "HOTS: Subjunctive & Conditional Inversion",
+        question: "_______ the Ministry of Education to implement nationwide coding bootcamps next semester, rural schools would require substantial broadband upgrades.",
+        options: {
+          A: "Had",
+          B: "Were",
+          C: "Did",
+          D: "Has",
+          E: "Was"
+        },
+        answer: "B"
+      },
+      {
+        difficulty: "Hard",
+        topic: "HOTS: Perfect Participle Clause",
+        question: "_______ rigorous peer-review trials across three universities, the biodegradable packaging prototype is finally ready for commercial production.",
+        options: {
+          A: "Having undergone",
+          B: "Undergoing",
+          C: "To undergo",
+          D: "Having been undergone",
+          E: "Being undergone"
+        },
+        answer: "A"
+      },
+      {
+        difficulty: "Hard",
+        topic: "HOTS: Subjunctive Mood (Mandative)",
+        question: "The environmental board insisted that every industrial factory along the river _______ an independent wastewater filtration system immediately.",
+        options: {
+          A: "installs",
+          B: "installed",
+          C: "install",
+          D: "installing",
+          E: "has installed"
+        },
+        answer: "C"
+      },
+      {
+        difficulty: "Hard",
+        topic: "HOTS: Advanced Academic Vocabulary",
+        question: "Read the sentence: 'While short-term subsidies may temporarily alleviate fuel costs, policymakers must devise a more PRAGMATIC long-term transition to clean energy.'\nIn this context, 'PRAGMATIC' most nearly means...",
+        options: {
+          A: "Idealistic and purely theoretical",
+          B: "Practical and realistically achievable",
+          C: "Hasty and poorly calculated",
+          D: "Controversial and politically risky",
+          E: "Temporary and superficial"
+        },
+        answer: "B"
+      },
+      {
+        difficulty: "Hard",
+        topic: "HOTS: Author's Tone & Critical Nuance",
+        question: "Passage: 'Despite grandiose pledges at international climate summits, global carbon emissions reached another record high last year—a stark reminder that rhetoric without enforceable policy achieves nothing.'\nWhich word best describes the author's tone?",
+        options: {
+          A: "Euphoric",
+          B: "Nostalgic",
+          C: "Critical and disillusioned",
+          D: "Playful and humorous",
+          E: "Apathetic"
+        },
+        answer: "C"
+      }
+    ];
+
+    // Kunci penyimpanan LocalStorage
+    const STORAGE_KEYS = {
+      QUESTIONS: 'indo_runner_eng12_questions_v3',
+      USERNAME: 'indo_runner_username_v2',
+      CHARACTER: 'indo_runner_character_v2',
+      LEADERBOARD: 'indo_runner_leaderboard_v2'
+    };
+
+    // Deteksi apakah dibuka dalam mode admin rahasia (?admin=1)
+    const isAdminMode = new URLSearchParams(window.location.search).get('admin') === '1';
+
+    function loadQuestions() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEYS.QUESTIONS);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch (e) {
+        console.warn('Gagal memuat soal tersimpan, menggunakan default:', e);
+      }
+      return JSON.parse(JSON.stringify(DEFAULT_QUESTIONS));
+    }
+
+    function saveQuestions(list) {
+      try {
+        localStorage.setItem(STORAGE_KEYS.QUESTIONS, JSON.stringify(list));
+      } catch (e) {
+        console.warn('Gagal menyimpan soal:', e);
+      }
+    }
+
+    let questionBank = loadQuestions();
+
+    /**
+     * =========================================================================
+     * SISTEM AUDIO WEB AUDIO API (EFEK SUARA TANPA FILE EKSTERNAL)
+     * =========================================================================
+     */
+    class SoundEffects {
+      constructor() {
+        this.muted = false;
+        this.ctx = null;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) this.ctx = new AudioCtx();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      playTone(freq, type = 'sine', duration = 0.15, gainVal = 0.14, slideTo = null) {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, now);
+        if (slideTo) {
+          osc.frequency.exponentialRampToValueAtTime(slideTo, now + duration);
+        }
+
+        gain.gain.setValueAtTime(gainVal, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + duration);
+      }
+
+      laneSwitch() { this.playTone(340, 'triangle', 0.08, 0.11, 500); }
+      jump() { this.playTone(270, 'sine', 0.18, 0.15, 580); }
+      slide() { this.playTone(390, 'triangle', 0.15, 0.13, 150); }
+      coin() {
+        this.playTone(920, 'sine', 0.07, 0.11);
+        setTimeout(() => this.playTone(1380, 'sine', 0.11, 0.11), 50);
+      }
+      quizPop() {
+        this.playTone(523.25, 'triangle', 0.11, 0.15);
+        setTimeout(() => this.playTone(659.25, 'triangle', 0.11, 0.15), 85);
+        setTimeout(() => this.playTone(783.99, 'triangle', 0.17, 0.15), 170);
+      }
+      correct() {
+        this.playTone(523.25, 'sine', 0.11, 0.17);
+        setTimeout(() => this.playTone(659.25, 'sine', 0.11, 0.17), 75);
+        setTimeout(() => this.playTone(1046.5, 'sine', 0.24, 0.19), 150);
+      }
+      wrong() {
+        this.playTone(220, 'sawtooth', 0.16, 0.14, 155);
+        setTimeout(() => this.playTone(170, 'sawtooth', 0.22, 0.14, 120), 130);
+      }
+      crash() {
+        this.playTone(135, 'sawtooth', 0.28, 0.2, 48);
+      }
+      tick() {
+        this.playTone(680, 'sine', 0.08, 0.12);
+      }
+    }
+
+    const sfx = new SoundEffects();
+
+    /**
+     * =========================================================================
+     * HELPER TEKSTUR PROSEDURAL CANVAS (UNTUK NUANSA INDONESIA YANG KAYA)
+     * =========================================================================
+     */
+    function makeAsphaltTexture() {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 512;
+      const ctx = c.getContext('2d');
+
+      // Base aspal abu-abu gelap realistis
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(0, 0, 512, 512);
+
+      // Butiran tekstur aspal halus
+      for (let i = 0; i < 6500; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+        const shade = Math.random() > 0.5 ? 'rgba(255,255,255,0.035)' : 'rgba(0,0,0,0.09)';
+        ctx.fillStyle = shade;
+        ctx.fillRect(x, y, 2, 2);
+      }
+
+      // Garis bahu jalan kuning khas jalan raya Indonesia
+      ctx.fillStyle = '#facc15';
+      ctx.fillRect(14, 0, 10, 512);
+      ctx.fillRect(488, 0, 10, 512);
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(1, 24);
+      return tex;
+    }
+
+    function makePavingTexture() {
+      const c = document.createElement('canvas');
+      c.width = 256;
+      c.height = 256;
+      const ctx = c.getContext('2d');
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillRect(0, 0, 256, 256);
+
+      ctx.strokeStyle = '#64748b';
+      ctx.lineWidth = 2;
+      const step = 32;
+      for (let y = 0; y < 256; y += step) {
+        const offset = (y / step) % 2 === 0 ? 0 : step / 2;
+        for (let x = -step; x < 256; x += step) {
+          ctx.strokeRect(x + offset, y, step, step);
+        }
+      }
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(6, 55);
+      return tex;
+    }
+
+    function createStorefrontTexture(storeName, subName, band1, band2, band3, wallColor = '#f8fafc') {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 512;
+      const ctx = c.getContext('2d');
+
+      // Dinding bangunan
+      ctx.fillStyle = wallColor;
+      ctx.fillRect(0, 0, 512, 512);
+
+      // Papan nama khas minimarket / warung Indonesia di bagian atas
+      ctx.fillStyle = band1;
+      ctx.fillRect(0, 24, 512, 34);
+      ctx.fillStyle = band2;
+      ctx.fillRect(0, 58, 512, 74);
+      ctx.fillStyle = band3;
+      ctx.fillRect(0, 132, 512, 22);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 42px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(storeName, 256, 95);
+
+      // Pintu kaca & etalase bawah
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(52, 210, 180, 270);
+      ctx.fillRect(280, 210, 180, 270);
+
+      // Kilau kaca etalase
+      ctx.fillStyle = 'rgba(125, 211, 252, 0.25)';
+      ctx.beginPath();
+      ctx.moveTo(65, 225);
+      ctx.lineTo(135, 225);
+      ctx.lineTo(95, 465);
+      ctx.lineTo(65, 465);
+      ctx.closePath();
+      ctx.fill();
+
+      // Spanduk kecil promo
+      if (subName) {
+        ctx.fillStyle = '#fef08a';
+        ctx.fillRect(65, 168, 382, 30);
+        ctx.fillStyle = '#991b1b';
+        ctx.font = 'bold 18px sans-serif';
+        ctx.fillText(subName, 256, 184);
+      }
+
+      return new THREE.CanvasTexture(c);
+    }
+
+    function createQuizBookTexture() {
+      const c = document.createElement('canvas');
+      c.width = 256;
+      c.height = 256;
+      const ctx = c.getContext('2d');
+
+      // Sampul Buku Emas-Biru Kerajaan
+      const grad = ctx.createLinearGradient(0, 0, 256, 256);
+      grad.addColorStop(0, '#f59e0b');
+      grad.addColorStop(1, '#d97706');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 256, 256);
+
+      ctx.strokeStyle = '#fef08a';
+      ctx.lineWidth = 14;
+      ctx.strokeRect(14, 14, 228, 228);
+
+      ctx.fillStyle = '#1e3a8a';
+      ctx.fillRect(36, 48, 184, 160);
+
+      ctx.fillStyle = '#fef08a';
+      ctx.font = 'bold 54px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('QUIZ', 128, 108);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 26px sans-serif';
+      ctx.fillText('ENGLISH XII', 128, 162);
+
+      return new THREE.CanvasTexture(c);
+    }
+
+    /**
+     * =========================================================================
+     * INISIALISASI SCENE 3D THREE.JS (SUASANA JALANAN KOTA INDONESIA YANG HIDUP)
+     * =========================================================================
+     */
+    const canvas = document.getElementById('game-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+
+    const scene = new THREE.Scene();
+
+    // Sky Dome Gradasi Langit Sore Tropis Indonesia
+    const skyGeo = new THREE.SphereGeometry(185, 24, 16);
+    const skyCanvas = document.createElement('canvas');
+    skyCanvas.width = 32;
+    skyCanvas.height = 256;
+    const skyCtx = skyCanvas.getContext('2d');
+    const skyGrad = skyCtx.createLinearGradient(0, 0, 0, 256);
+    skyGrad.addColorStop(0.0, '#1d4ed8');
+    skyGrad.addColorStop(0.38, '#38bdf8');
+    skyGrad.addColorStop(0.55, '#bae6fd');
+    skyGrad.addColorStop(0.66, '#fed7aa');
+    skyGrad.addColorStop(1.0, '#fef3c7');
+    skyCtx.fillStyle = skyGrad;
+    skyCtx.fillRect(0, 0, 32, 256);
+    const skyTex = new THREE.CanvasTexture(skyCanvas);
+    const skyDome = new THREE.Mesh(skyGeo, new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, fog: false }));
+    scene.add(skyDome);
+
+    scene.fog = new THREE.FogExp2(0xbae6fd, 0.0078);
+
+    const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 230);
+    camera.position.set(0, 6.2, 11.5);
+    camera.lookAt(0, 2.0, -10);
+
+    // Pencahayaan Matahari Sore Tropis
+    const hemiLight = new THREE.HemisphereLight(0xfffbeb, 0x334155, 0.9);
+    hemiLight.position.set(0, 45, 0);
+    scene.add(hemiLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffedd5, 1.15);
+    dirLight.position.set(20, 34, 18);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 1024;
+    dirLight.shadow.mapSize.height = 1024;
+    dirLight.shadow.camera.near = 5;
+    dirLight.shadow.camera.far = 115;
+    const d = 24;
+    dirLight.shadow.camera.left = -d;
+    dirLight.shadow.camera.right = d;
+    dirLight.shadow.camera.top = d;
+    dirLight.shadow.camera.bottom = -d;
+    scene.add(dirLight);
+
+    // Awan Tropis Melayang di Langit
+    const clouds = [];
+    const cloudMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, fog: false });
+    for (let i = 0; i < 10; i++) {
+      const cGroup = new THREE.Group();
+      for (let b = 0; b < 3; b++) {
+        const puff = new THREE.Mesh(new THREE.DodecahedronGeometry(2.4 + b * 0.5, 1), cloudMat);
+        puff.position.set((b - 1) * 2.5, (b % 2) * 0.7, 0);
+        puff.scale.set(1.4, 0.65, 0.9);
+        cGroup.add(puff);
+      }
+      cGroup.position.set(-45 + i * 11, 24 + (i % 3) * 3.5, -95 - (i % 4) * 14);
+      scene.add(cGroup);
+      clouds.push(cGroup);
+    }
+
+    // Siluet Gedung Pencakar Langit Jakarta di Kejauhan
+    const skylineMat = new THREE.MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.55 });
+    for (let i = 0; i < 18; i++) {
+      const h = 14 + (i * 7) % 24;
+      const w = 5 + (i % 4) * 2;
+      const tower = new THREE.Mesh(new THREE.BoxGeometry(w, h, 4), skylineMat);
+      tower.position.set(-55 + i * 6.5, h / 2, -148 - (i % 3) * 6);
+      scene.add(tower);
+    }
+
+    // Konstanta Jalur (3 Lajur ala Subway Surfers: Kiri -3.2, Tengah 0, Kanan +3.2)
+    const LANES = [-3.2, 0, 3.2];
+    const ROAD_WIDTH = 11.6;
+
+    // Aspal Jalan Utama dengan Tekstur & Garis Bahu Kuning
+    const asphaltTex = makeAsphaltTexture();
+    const roadGeo = new THREE.PlaneGeometry(ROAD_WIDTH, 260);
+    const roadMat = new THREE.MeshStandardMaterial({ map: asphaltTex, roughness: 0.85 });
+    const roadMesh = new THREE.Mesh(roadGeo, roadMat);
+    roadMesh.rotation.x = -Math.PI / 2;
+    roadMesh.position.z = -90;
+    roadMesh.receiveShadow = true;
+    scene.add(roadMesh);
+
+    // Trotoar Kiri & Kanan dengan Tekstur Paving Block
+    const pavingTex = makePavingTexture();
+    const sidewalkGeo = new THREE.BoxGeometry(18, 0.42, 260);
+    const sidewalkMat = new THREE.MeshStandardMaterial({ map: pavingTex, roughness: 0.9 });
+    const leftSidewalk = new THREE.Mesh(sidewalkGeo, sidewalkMat);
+    leftSidewalk.position.set(-(ROAD_WIDTH / 2 + 9), 0.16, -90);
+    leftSidewalk.receiveShadow = true;
+    scene.add(leftSidewalk);
+
+    const rightSidewalk = new THREE.Mesh(sidewalkGeo, sidewalkMat);
+    rightSidewalk.position.set(ROAD_WIDTH / 2 + 9, 0.16, -90);
+    rightSidewalk.receiveShadow = true;
+    scene.add(rightSidewalk);
+
+    // Marka Jalan Putus-Putus, Zebra Cross & Kanstin Hitam-Putih Khas Indonesia
+    const roadStripes = [];
+    const zebraCrossings = [];
+    const curbBlocks = [];
+    const stripeGeo = new THREE.PlaneGeometry(0.22, 3.2);
+    const stripeMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc });
+
+    const curbGeo = new THREE.BoxGeometry(0.45, 0.46, 3.5);
+    const curbWhiteMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc });
+    const curbBlackMat = new THREE.MeshStandardMaterial({ color: 0x0f172a });
+
+    for (let i = 0; i < 34; i++) {
+      const zPos = 15 - i * 7;
+      [-1.6, 1.6].forEach(xPos => {
+        const s = new THREE.Mesh(stripeGeo, stripeMat);
+        s.rotation.x = -Math.PI / 2;
+        s.position.set(xPos, 0.02, zPos);
+        scene.add(s);
+        roadStripes.push(s);
+      });
+
+      const isWhite = i % 2 === 0;
+      [-ROAD_WIDTH / 2 - 0.1, ROAD_WIDTH / 2 + 0.1].forEach(xSide => {
+        const curb = new THREE.Mesh(curbGeo, isWhite ? curbWhiteMat : curbBlackMat);
+        curb.position.set(xSide, 0.23, zPos);
+        scene.add(curb);
+        curbBlocks.push(curb);
+      });
+    }
+
+    // Zebra Cross berkala di jalan raya
+    for (let zc = 0; zc < 4; zc++) {
+      const zGroup = new THREE.Group();
+      for (let bar = -4; bar <= 4; bar++) {
+        const zBar = new THREE.Mesh(new THREE.PlaneGeometry(0.65, 2.8), stripeMat);
+        zBar.rotation.x = -Math.PI / 2;
+        zBar.position.set(bar * 1.15, 0.025, 0);
+        zGroup.add(zBar);
+      }
+      zGroup.position.z = -15 - zc * 60;
+      scene.add(zGroup);
+      zebraCrossings.push(zGroup);
+    }
+
+    // Tekstur Toko-Toko Khas Jalanan Indonesia
+    const storeTextures = [
+      createStorefrontTexture('INDOMARET', 'HEMAT MINGGU INI • PROMO', '#dc2626', '#1d4ed8', '#facc15'),
+      createStorefrontTexture('ALFAMART', 'BELANJA PUAS HARGA PAS', '#dc2626', '#facc15', '#1d4ed8'),
+      createStorefrontTexture('WARTEG BAHARI', 'NASI RAMES • AYAM GORENG • ES TEH', '#15803d', '#f59e0b', '#166534', '#fef3c7'),
+      createStorefrontTexture('KOPI KENANGAN', 'ES KOPI SUSU GULA AREN', '#78350f', '#b45309', '#fde68a', '#ffedd5')
+    ];
+
+    // Dekorasi Kota Indonesia (Minimarket, Warteg, Ruko, Pohon Peneduh, Lampu Jalan, Tiang Listrik, Rambu)
+    const sceneryProps = [];
+    const rukoColors = [0xfef3c7, 0xe0f2fe, 0xfce7f3, 0xdcfce7, 0xffedd5, 0xf1f5f9];
+    const awningColors = [0xdc2626, 0x0284c7, 0x16a34a, 0xd97706];
+
+    function createBuildingOrTree(side, zPos, index) {
+      const group = new THREE.Group();
+      const xBase = side * (ROAD_WIDTH / 2 + 5.0);
+
+      const width = 4.8 + (index % 2) * 0.8;
+      const height = index % 3 === 0 ? 5.6 : 7.5 + (index % 3) * 2.2;
+      const depth = 6.8;
+
+      if (index % 3 === 0) {
+        // Minimarket / Warteg Khas Indonesia dengan Tekstur Papan Nama
+        const tex = storeTextures[index % storeTextures.length];
+        const storeMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.65 });
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.75 });
+        const mats = side === -1
+          ? [storeMat, wallMat, wallMat, wallMat, wallMat, wallMat] // Menghadap jalan (+X)
+          : [wallMat, storeMat, wallMat, wallMat, wallMat, wallMat]; // Menghadap jalan (-X)
+
+        const storeMesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), mats);
+        storeMesh.position.set(xBase + side * (width / 2), height / 2 + 0.3, 0);
+        storeMesh.castShadow = true;
+        storeMesh.receiveShadow = true;
+        group.add(storeMesh);
+
+        // Atap genteng terakota khas Indonesia
+        const roof = new THREE.Mesh(
+          new THREE.ConeGeometry(width * 0.85, 1.8, 4),
+          new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.7 })
+        );
+        roof.rotation.y = Math.PI / 4;
+        roof.position.set(xBase + side * (width / 2), height + 1.15, 0);
+        group.add(roof);
+      } else {
+        // Ruko 2-3 Lantai + Kanopi + Unit AC
+        const bGeo = new THREE.BoxGeometry(width, height, depth);
+        const bMat = new THREE.MeshStandardMaterial({
+          color: rukoColors[index % rukoColors.length],
+          roughness: 0.75
+        });
+        const building = new THREE.Mesh(bGeo, bMat);
+        building.position.set(xBase + side * (width / 2), height / 2 + 0.3, 0);
+        building.castShadow = true;
+        building.receiveShadow = true;
+        group.add(building);
+
+        const awningGeo = new THREE.BoxGeometry(1.5, 0.25, depth * 0.88);
+        const awningMat = new THREE.MeshStandardMaterial({ color: awningColors[index % awningColors.length] });
+        const awning = new THREE.Mesh(awningGeo, awningMat);
+        awning.position.set(xBase - side * 0.55, 2.8, 0);
+        group.add(awning);
+
+        const winMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.2 });
+        const winGeo = new THREE.BoxGeometry(0.16, 1.3, 1.45);
+        for (let floor = 1; floor <= Math.floor(height / 3.2); floor++) {
+          const win = new THREE.Mesh(winGeo, winMat);
+          win.position.set(xBase - side * 0.05, floor * 2.8 + 0.6, -1.45);
+          group.add(win);
+          const win2 = win.clone();
+          win2.position.z = 1.45;
+          group.add(win2);
+        }
+      }
+
+      // Pohon Peneduh Jalan / Pohon Palem Tropis
+      if (index % 2 === 0) {
+        const trunk = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.22, 0.32, 2.7, 8),
+          new THREE.MeshStandardMaterial({ color: 0x78350f })
+        );
+        trunk.position.set(side * (ROAD_WIDTH / 2 + 1.55), 1.55, 2.9);
+        trunk.castShadow = true;
+        group.add(trunk);
+
+        const crown = new THREE.Mesh(
+          new THREE.DodecahedronGeometry(1.55, 1),
+          new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.8 })
+        );
+        crown.position.set(side * (ROAD_WIDTH / 2 + 1.55), 3.55, 2.9);
+        crown.castShadow = true;
+        group.add(crown);
+      } else {
+        // Tiang Lampu Jalan & Rambu Lalu Lintas Indonesia
+        const pole = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.09, 0.12, 5.2, 8),
+          new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.6 })
+        );
+        pole.position.set(side * (ROAD_WIDTH / 2 + 1.15), 2.7, -2.5);
+        group.add(pole);
+
+        const arm = new THREE.Mesh(
+          new THREE.BoxGeometry(1.4, 0.1, 0.1),
+          new THREE.MeshStandardMaterial({ color: 0x334155 })
+        );
+        arm.position.set(side * (ROAD_WIDTH / 2 + 0.55), 5.2, -2.5);
+        group.add(arm);
+
+        const lampBulb = new THREE.Mesh(
+          new THREE.BoxGeometry(0.45, 0.14, 0.22),
+          new THREE.MeshBasicMaterial({ color: 0xfef08a })
+        );
+        lampBulb.position.set(side * (ROAD_WIDTH / 2 + 0.15), 5.12, -2.5);
+        group.add(lampBulb);
+
+        // Rambu Lalu Lintas (Dilarang Parkir / Peringatan) setiap beberapa blok
+        if (index % 4 === 1) {
+          const signPost = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.05, 0.05, 2.4, 6),
+            new THREE.MeshStandardMaterial({ color: 0x94a3b8 })
+          );
+          signPost.position.set(side * (ROAD_WIDTH / 2 + 0.85), 1.4, 2.2);
+          group.add(signPost);
+
+          const signDisc = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.38, 0.38, 0.06, 16),
+            new THREE.MeshStandardMaterial({ color: 0xdc2626 })
+          );
+          signDisc.rotation.x = Math.PI / 2;
+          signDisc.position.set(side * (ROAD_WIDTH / 2 + 0.85), 2.45, 2.2);
+          group.add(signDisc);
+        }
+      }
+
+      group.position.z = zPos;
+      scene.add(group);
+      return group;
+    }
+
+    for (let i = 0; i < 24; i++) {
+      const z = 12 - i * 9.5;
+      sceneryProps.push(createBuildingOrTree(-1, z, i));
+      sceneryProps.push(createBuildingOrTree(1, z, i + 3));
+    }
+
+    /**
+     * =========================================================================
+     * PEMBUATAN KARAKTER 3D PELAJAR SMA INDONESIA (COWOK & CEWEK)
+     * =========================================================================
+     */
+    function buildCharacterMesh(gender = 'cowok') {
+      const root = new THREE.Group();
+
+      const isFemale = gender === 'cewek';
+      const skinMat = new THREE.MeshStandardMaterial({ color: 0xf1c27d, roughness: 0.55 });
+      // Seragam Putih-Abu SMA Indonesia yang ikonik & bersih
+      const shirtMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.45 });
+      const tieMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.5 });
+      const badgeMat = new THREE.MeshStandardMaterial({ color: 0xdc2626 });
+      const pantsMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.65 }); // Abu-abu SMA
+      const hairMat = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.8 });
+      const shoeMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.45 });
+      const shoeSoleMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+
+      const bodyPivot = new THREE.Group();
+      bodyPivot.position.y = 1.05;
+      root.add(bodyPivot);
+
+      // Kemeja Seragam Putih
+      const torso = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.95, 0.46), shirtMat);
+      torso.position.y = 0.48;
+      torso.castShadow = true;
+      bodyPivot.add(torso);
+
+      // Dasi Abu-Abu SMA di Depan Dada
+      const tie = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.56, 0.06), tieMat);
+      tie.position.set(0, 0.55, -0.24);
+      bodyPivot.add(tie);
+
+      // Badge OSIS Merah di Saku Kiri
+      const osisBadge = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, 0.04), badgeMat);
+      osisBadge.position.set(-0.22, 0.68, -0.24);
+      bodyPivot.add(osisBadge);
+
+      // Tas Ransel Sekolah
+      const backpack = new THREE.Mesh(
+        new THREE.BoxGeometry(0.64, 0.74, 0.3),
+        new THREE.MeshStandardMaterial({ color: isFemale ? 0xfbbf24 : 0xdc2626, roughness: 0.5 })
+      );
+      backpack.position.set(0, 0.5, 0.35);
+      backpack.castShadow = true;
+      bodyPivot.add(backpack);
+
+      // Kepala
+      const headGroup = new THREE.Group();
+      headGroup.position.y = 1.28;
+      bodyPivot.add(headGroup);
+
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.64, 0.64), skinMat);
+      head.castShadow = true;
+      headGroup.add(head);
+
+      // Rambut
+      const hairTop = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.24, 0.68), hairMat);
+      hairTop.position.y = 0.26;
+      headGroup.add(hairTop);
+
+      const hairBack = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.52, 0.22), hairMat);
+      hairBack.position.set(0, 0.08, 0.26);
+      headGroup.add(hairBack);
+
+      if (isFemale) {
+        const ponytail = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.58, 0.24), hairMat);
+        ponytail.position.set(0, 0.04, 0.46);
+        ponytail.rotation.x = 0.35;
+        headGroup.add(ponytail);
+
+        const ribbon = new THREE.Mesh(
+          new THREE.BoxGeometry(0.32, 0.14, 0.14),
+          new THREE.MeshStandardMaterial({ color: 0xec4899 })
+        );
+        ribbon.position.set(0, 0.24, 0.38);
+        headGroup.add(ribbon);
+      } else {
+        const fringe = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.16, 0.22), hairMat);
+        fringe.position.set(0, 0.22, -0.28);
+        headGroup.add(fringe);
+      }
+
+      // Lengan Kiri & Kanan (Lengan pendek seragam putih + lengan kulit)
+      function makeArm(xOffset) {
+        const armPivot = new THREE.Group();
+        armPivot.position.set(xOffset, 0.88, 0);
+
+        const sleeve = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.34, 0.26), shirtMat);
+        sleeve.position.y = -0.15;
+        sleeve.castShadow = true;
+        armPivot.add(sleeve);
+
+        const forearm = new THREE.Mesh(new THREE.BoxGeometry(0.21, 0.46, 0.21), skinMat);
+        forearm.position.y = -0.52;
+        forearm.castShadow = true;
+        armPivot.add(forearm);
+
+        bodyPivot.add(armPivot);
+        return armPivot;
+      }
+
+      const leftArm = makeArm(-0.56);
+      const rightArm = makeArm(0.56);
+
+      // Kaki Kiri & Kanan (Celana Abu-Abu SMA + Sepatu Hitam Sol Putih)
+      function makeLeg(xOffset) {
+        const legPivot = new THREE.Group();
+        legPivot.position.set(xOffset, 1.05, 0);
+
+        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.85, 0.32), pantsMat);
+        leg.position.y = -0.42;
+        leg.castShadow = true;
+        legPivot.add(leg);
+
+        const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.33, 0.22, 0.48), shoeMat);
+        shoe.position.set(0, -0.92, -0.06);
+        shoe.castShadow = true;
+        legPivot.add(shoe);
+
+        const sole = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.07, 0.5), shoeSoleMat);
+        sole.position.set(0, -1.01, -0.06);
+        legPivot.add(sole);
+
+        root.add(legPivot);
+        return legPivot;
+      }
+
+      const leftLeg = makeLeg(-0.22);
+      const rightLeg = makeLeg(0.22);
+
+      return {
+        root,
+        bodyPivot,
+        leftArm,
+        rightArm,
+        leftLeg,
+        rightLeg
+      };
+    }
+
+    let selectedCharType = localStorage.getItem(STORAGE_KEYS.CHARACTER) || 'cowok';
+    let playerRig = buildCharacterMesh(selectedCharType);
+    scene.add(playerRig.root);
+
+    function switchPlayerCharacter(gender) {
+      selectedCharType = gender;
+      localStorage.setItem(STORAGE_KEYS.CHARACTER, gender);
+      const prevPos = playerRig.root.position.clone();
+      scene.remove(playerRig.root);
+      playerRig = buildCharacterMesh(gender);
+      playerRig.root.position.copy(prevPos);
+      scene.add(playerRig.root);
+    }
+
+    /**
+     * =========================================================================
+     * PEMBUATAN KENDARAAN 3D KHAS INDONESIA (RINTANGAN)
+     * 1. Motor (Ojol / Matic)
+     * 2. Mobil (MPV Keluarga)
+     * 3. Bus Kota (TransJakarta / Bus Antar Kota)
+     * 4. Truk (Truk Bak Kayu / Truk Logistik)
+     * 5. Mobil MBG (Makan Bergizi Gratis - Putih Biru Hijau dengan Logo MBG)
+     * =========================================================================
+     */
+    function createLabelTexture(titleText, subText, bgColor = '#ffffff', textColor = '#0f172a', accentColor = '#16a34a') {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 256;
+      const ctx = c.getContext('2d');
+
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, c.width, c.height);
+
+      ctx.fillStyle = accentColor;
+      ctx.fillRect(0, 0, c.width, 28);
+      ctx.fillStyle = '#0284c7';
+      ctx.fillRect(0, c.height - 28, c.width, 28);
+
+      ctx.fillStyle = textColor;
+      ctx.font = 'bold 64px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(titleText, c.width / 2, c.height / 2 - 16);
+
+      if (subText) {
+        ctx.fillStyle = '#15803d';
+        ctx.font = 'bold 30px sans-serif';
+        ctx.fillText(subText, c.width / 2, c.height / 2 + 44);
+      }
+
+      return new THREE.CanvasTexture(c);
+    }
+
+    const mbgSideTexture = createLabelTexture('MOBIL MBG', 'Makan Bergizi Gratis', '#ffffff', '#0369a1', '#22c55e');
+
+    function addWheelsToVehicle(group, positions, radius = 0.42, width = 0.28) {
+      const wheelGeo = new THREE.CylinderGeometry(radius, radius, width, 14);
+      const wheelMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.85 });
+      const rimGeo = new THREE.CylinderGeometry(radius * 0.55, radius * 0.55, width + 0.02, 10);
+      const rimMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.6 });
+
+      positions.forEach(([x, y, z]) => {
+        const w = new THREE.Mesh(wheelGeo, wheelMat);
+        w.rotation.z = Math.PI / 2;
+        w.position.set(x, y, z);
+        group.add(w);
+
+        const r = new THREE.Mesh(rimGeo, rimMat);
+        r.rotation.z = Math.PI / 2;
+        r.position.set(x, y, z);
+        group.add(r);
+      });
+    }
+
+    function createVehicleObstacle(type) {
+      const group = new THREE.Group();
+      let height = 1.6;
+      let length = 3.6;
+
+      if (type === 'motor') {
+        height = 1.35;
+        length = 2.2;
+
+        const bodyColor = [0xdc2626, 0x16a34a, 0x2563eb, 0x18181b][Math.floor(Math.random() * 4)];
+        const bodyMat = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.4 });
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.65, 1.8), bodyMat);
+        body.position.set(0, 0.68, 0);
+        body.castShadow = true;
+        group.add(body);
+
+        const handlebar = new THREE.Mesh(
+          new THREE.BoxGeometry(0.95, 0.1, 0.12),
+          new THREE.MeshStandardMaterial({ color: 0x334155 })
+        );
+        handlebar.position.set(0, 1.15, 0.62);
+        group.add(handlebar);
+
+        const headlight = new THREE.Mesh(
+          new THREE.BoxGeometry(0.28, 0.2, 0.1),
+          new THREE.MeshBasicMaterial({ color: 0xfef08a })
+        );
+        headlight.position.set(0, 1.02, 0.88);
+        group.add(headlight);
+
+        const riderBody = new THREE.Mesh(
+          new THREE.BoxGeometry(0.55, 0.75, 0.45),
+          new THREE.MeshStandardMaterial({ color: 0x10b981 })
+        );
+        riderBody.position.set(0, 1.25, -0.05);
+        group.add(riderBody);
+
+        const helmet = new THREE.Mesh(
+          new THREE.SphereGeometry(0.28, 12, 12),
+          new THREE.MeshStandardMaterial({ color: 0x0f172a })
+        );
+        helmet.position.set(0, 1.78, 0.02);
+        group.add(helmet);
+
+        addWheelsToVehicle(group, [[0, 0.34, 0.72], [0, 0.34, -0.72]], 0.34, 0.2);
+
+      } else if (type === 'mobil') {
+        height = 1.75;
+        length = 4.2;
+
+        const carColor = [0xf8fafc, 0x94a3b8, 0x1e293b, 0xb91c1c, 0x0369a1][Math.floor(Math.random() * 5)];
+        const carMat = new THREE.MeshStandardMaterial({ color: carColor, roughness: 0.35, metalness: 0.2 });
+
+        const lowerBody = new THREE.Mesh(new THREE.BoxGeometry(1.95, 0.85, 4.1), carMat);
+        lowerBody.position.y = 0.78;
+        lowerBody.castShadow = true;
+        group.add(lowerBody);
+
+        const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.75, 0.68, 2.55), carMat);
+        cabin.position.set(0, 1.48, -0.2);
+        cabin.castShadow = true;
+        group.add(cabin);
+
+        const glassMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.15 });
+        const windshield = new THREE.Mesh(new THREE.BoxGeometry(1.62, 0.52, 2.6), glassMat);
+        windshield.position.set(0, 1.48, -0.2);
+        group.add(windshield);
+
+        const hlGeo = new THREE.BoxGeometry(0.36, 0.2, 0.08);
+        const hlMat = new THREE.MeshBasicMaterial({ color: 0xfef9c3 });
+        [-0.65, 0.65].forEach(x => {
+          const hl = new THREE.Mesh(hlGeo, hlMat);
+          hl.position.set(x, 0.82, 2.06);
+          group.add(hl);
+        });
+
+        addWheelsToVehicle(group, [
+          [-0.95, 0.4, 1.25], [0.95, 0.4, 1.25],
+          [-0.95, 0.4, -1.25], [0.95, 0.4, -1.25]
+        ], 0.4, 0.26);
+
+      } else if (type === 'mbg') {
+        height = 2.55;
+        length = 4.8;
+
+        const cabMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3 });
+        const cab = new THREE.Mesh(new THREE.BoxGeometry(2.05, 1.85, 1.45), cabMat);
+        cab.position.set(0, 1.28, 1.55);
+        cab.castShadow = true;
+        group.add(cab);
+
+        const glass = new THREE.Mesh(
+          new THREE.BoxGeometry(1.88, 0.72, 0.1),
+          new THREE.MeshStandardMaterial({ color: 0x0f172a })
+        );
+        glass.position.set(0, 1.62, 2.26);
+        group.add(glass);
+
+        const boxMaterials = [
+          new THREE.MeshStandardMaterial({ map: mbgSideTexture }),
+          new THREE.MeshStandardMaterial({ map: mbgSideTexture }),
+          new THREE.MeshStandardMaterial({ color: 0x22c55e }),
+          new THREE.MeshStandardMaterial({ color: 0x334155 }),
+          new THREE.MeshStandardMaterial({ color: 0xffffff }),
+          new THREE.MeshStandardMaterial({ map: mbgSideTexture })
+        ];
+        const cargoBox = new THREE.Mesh(new THREE.BoxGeometry(2.15, 2.05, 3.2), boxMaterials);
+        cargoBox.position.set(0, 1.45, -0.75);
+        cargoBox.castShadow = true;
+        group.add(cargoBox);
+
+        [-0.7, 0.7].forEach(x => {
+          const hl = new THREE.Mesh(
+            new THREE.BoxGeometry(0.36, 0.22, 0.08),
+            new THREE.MeshBasicMaterial({ color: 0xfef08a })
+          );
+          hl.position.set(x, 0.75, 2.29);
+          group.add(hl);
+        });
+
+        addWheelsToVehicle(group, [
+          [-0.98, 0.44, 1.5], [0.98, 0.44, 1.5],
+          [-0.98, 0.44, -1.4], [0.98, 0.44, -1.4]
+        ], 0.44, 0.28);
+
+      } else if (type === 'truk') {
+        height = 2.75;
+        length = 5.4;
+
+        const cabColor = Math.random() > 0.5 ? 0xfacc15 : 0xdc2626;
+        const cab = new THREE.Mesh(
+          new THREE.BoxGeometry(2.15, 2.05, 1.6),
+          new THREE.MeshStandardMaterial({ color: cabColor, roughness: 0.4 })
+        );
+        cab.position.set(0, 1.42, 1.75);
+        cab.castShadow = true;
+        group.add(cab);
+
+        const windshield = new THREE.Mesh(
+          new THREE.BoxGeometry(1.92, 0.78, 0.1),
+          new THREE.MeshStandardMaterial({ color: 0x0f172a })
+        );
+        windshield.position.set(0, 1.78, 2.54);
+        group.add(windshield);
+
+        const bed = new THREE.Mesh(
+          new THREE.BoxGeometry(2.25, 2.15, 3.6),
+          new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.85 })
+        );
+        bed.position.set(0, 1.52, -0.85);
+        bed.castShadow = true;
+        group.add(bed);
+
+        const tarp = new THREE.Mesh(
+          new THREE.BoxGeometry(2.3, 0.45, 3.65),
+          new THREE.MeshStandardMaterial({ color: 0x166534 })
+        );
+        tarp.position.set(0, 2.62, -0.85);
+        group.add(tarp);
+
+        addWheelsToVehicle(group, [
+          [-1.02, 0.48, 1.7], [1.02, 0.48, 1.7],
+          [-1.02, 0.48, -1.5], [1.02, 0.48, -1.5]
+        ], 0.48, 0.3);
+
+      } else {
+        height = 3.05;
+        length = 6.8;
+
+        const busBody = new THREE.Mesh(
+          new THREE.BoxGeometry(2.25, 2.65, 6.6),
+          new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.35 })
+        );
+        busBody.position.set(0, 1.75, 0);
+        busBody.castShadow = true;
+        group.add(busBody);
+
+        const stripe = new THREE.Mesh(
+          new THREE.BoxGeometry(2.29, 0.65, 6.64),
+          new THREE.MeshStandardMaterial({ color: 0x0284c7 })
+        );
+        stripe.position.set(0, 1.15, 0);
+        group.add(stripe);
+
+        const sideGlass = new THREE.Mesh(
+          new THREE.BoxGeometry(2.28, 0.85, 5.8),
+          new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.15 })
+        );
+        sideGlass.position.set(0, 2.15, 0);
+        group.add(sideGlass);
+
+        const frontGlass = new THREE.Mesh(
+          new THREE.BoxGeometry(2.05, 1.15, 0.1),
+          new THREE.MeshStandardMaterial({ color: 0x0f172a })
+        );
+        frontGlass.position.set(0, 2.05, 3.31);
+        group.add(frontGlass);
+
+        const routeSign = new THREE.Mesh(
+          new THREE.BoxGeometry(1.5, 0.28, 0.12),
+          new THREE.MeshBasicMaterial({ color: 0xf59e0b })
+        );
+        routeSign.position.set(0, 2.82, 3.31);
+        group.add(routeSign);
+
+        addWheelsToVehicle(group, [
+          [-1.04, 0.5, 2.1], [1.04, 0.5, 2.1],
+          [-1.04, 0.5, -2.1], [1.04, 0.5, -2.1]
+        ], 0.5, 0.32);
+      }
+
+      return { mesh: group, type, height, length };
+    }
+
+    /**
+     * =========================================================================
+     * KOIN RUPIAH & ITEM BUKU KUIS EMAS (PEMICU SOAL) + PARTIKEL JUICE
+     * =========================================================================
+     */
+    const coinGeo = new THREE.CylinderGeometry(0.45, 0.45, 0.14, 16);
+    const coinMat = new THREE.MeshStandardMaterial({
+      color: 0xfbbf24,
+      emissive: 0xd97706,
+      emissiveIntensity: 0.38,
+      metalness: 0.75,
+      roughness: 0.2
+    });
+
+    const quizBookTex = createQuizBookTexture();
+    const quizBoxGeo = new THREE.BoxGeometry(1.15, 1.35, 0.38);
+    const quizBoxMat = new THREE.MeshStandardMaterial({
+      map: quizBookTex,
+      emissive: 0xf59e0b,
+      emissiveIntensity: 0.35,
+      roughness: 0.2
+    });
+
+    // Sistem Partikel Ringan (Kilau Koin / Debu Lari)
+    const particles = [];
+    const particleGeo = new THREE.BoxGeometry(0.14, 0.14, 0.14);
+
+    function spawnBurstParticles(x, y, z, colorHex = 0xfbbf24, count = 12) {
+      const mat = new THREE.MeshBasicMaterial({ color: colorHex });
+      for (let i = 0; i < count; i++) {
+        const p = new THREE.Mesh(particleGeo, mat);
+        p.position.set(x, y, z);
+        scene.add(p);
+        particles.push({
+          mesh: p,
+          vx: (Math.random() - 0.5) * 7,
+          vy: Math.random() * 5 + 2,
+          vz: (Math.random() - 0.5) * 7,
+          life: 0.55
+        });
+      }
+    }
+
+    /**
+     * =========================================================================
+     * STATE & LOGIKA PERMAINAN UTAMA
+     * =========================================================================
+     */
+    const gameState = {
+      status: 'HOME', // HOME | PLAYING | QUIZ | COUNTDOWN | PAUSED | GAMEOVER | VICTORY
+      username: localStorage.getItem(STORAGE_KEYS.USERNAME) || '',
+      score: 0,
+      coins: 0,
+      hearts: 3,
+      speed: 22,
+      baseSpeed: 22,
+      maxSpeed: 42,
+      timeSinceLastQuizItem: 0, // Pengatur jeda kemunculan item buku kuis (tidak terlalu sering!)
+      quizItemCooldown: 16,     // Item buku kuis muncul berkala setiap ~16 detik lari
+      invulnerableTimer: 0,
+
+      // Posisi & Fisika Pemain
+      currentLane: 1,
+      targetX: 0,
+      playerY: 0,
+      velocityY: 0,
+      isJumping: false,
+      isSliding: false,
+      slideTimer: 0,
+      runAnimTime: 0,
+
+      // Data Kuis Sesi Ini (30 Soal Bahasa Inggris Kelas 12 diacak)
+      sessionQuestions: [],
+      currentQuestionIndex: 0,
+      correctCount: 0,
+      quizLocked: false
+    };
+
+    const activeObstacles = [];
+    const activeCoins = [];
+    const activeQuizBoxes = [];
+    let spawnTimer = 0;
+
+    function shuffleArray(arr) {
+      const copy = JSON.parse(JSON.stringify(arr));
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    }
+
+    function clearTrackEntities() {
+      activeObstacles.forEach(o => scene.remove(o.mesh));
+      activeObstacles.length = 0;
+      activeCoins.forEach(c => scene.remove(c.mesh));
+      activeCoins.length = 0;
+      activeQuizBoxes.forEach(q => scene.remove(q.mesh));
+      activeQuizBoxes.length = 0;
+    }
+
+    // Spawn gelombang kendaraan Indonesia, koin, dan Item Buku Kuis (hanya saat cooldown tercapai)
+    function spawnWave() {
+      const vehicleTypes = ['motor', 'mobil', 'bus', 'truk', 'mbg'];
+      const lanes = [0, 1, 2];
+      for (let i = lanes.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [lanes[i], lanes[j]] = [lanes[j], lanes[i]];
+      }
+
+      const numVehicles = Math.random() < 0.56 ? 2 : 1;
+      const zSpawn = -118;
+
+      for (let i = 0; i < numVehicles; i++) {
+        const laneIdx = lanes[i];
+        const vType = vehicleTypes[Math.floor(Math.random() * vehicleTypes.length)];
+        const vehicle = createVehicleObstacle(vType);
+        vehicle.mesh.position.set(LANES[laneIdx], 0, zSpawn - i * 2.5);
+        vehicle.lane = laneIdx;
+        scene.add(vehicle.mesh);
+        activeObstacles.push(vehicle);
+      }
+
+      // Lajur aman diisi deretan koin atau Item Buku Kuis (jika sudah waktunya muncul)
+      const safeLane = lanes[numVehicles];
+      const canSpawnQuizItem =
+        gameState.timeSinceLastQuizItem >= gameState.quizItemCooldown &&
+        activeQuizBoxes.length === 0 &&
+        gameState.currentQuestionIndex < gameState.sessionQuestions.length;
+
+      if (canSpawnQuizItem) {
+        gameState.timeSinceLastQuizItem = 0;
+
+        // Buat grup Buku Kuis Emas + Cincin Cahaya di bawahnya agar sangat mencolok
+        const itemGroup = new THREE.Group();
+        const bookMesh = new THREE.Mesh(quizBoxGeo, quizBoxMat);
+        bookMesh.castShadow = true;
+        itemGroup.add(bookMesh);
+
+        const haloRing = new THREE.Mesh(
+          new THREE.RingGeometry(0.65, 0.9, 24),
+          new THREE.MeshBasicMaterial({ color: 0xfef08a, side: THREE.DoubleSide })
+        );
+        haloRing.rotation.x = -Math.PI / 2;
+        haloRing.position.y = -1.1;
+        itemGroup.add(haloRing);
+
+        itemGroup.position.set(LANES[safeLane], 1.35, zSpawn);
+        scene.add(itemGroup);
+        activeQuizBoxes.push({ mesh: itemGroup, bookMesh, lane: safeLane });
+      } else {
+        for (let k = 0; k < 4; k++) {
+          const coin = new THREE.Mesh(coinGeo, coinMat);
+          coin.rotation.x = Math.PI / 2;
+          coin.position.set(LANES[safeLane], 1.0, zSpawn - k * 2.4);
+          scene.add(coin);
+          activeCoins.push({ mesh: coin, lane: safeLane });
+        }
+      }
+    }
+
+    /**
+     * =========================================================================
+     * KONTROL PEMAIN (KEYBOARD & SWIPE LAYAR SENTUH)
+     * =========================================================================
+     */
+    function moveLeft() {
+      if (gameState.status !== 'PLAYING') return;
+      if (gameState.currentLane > 0) {
+        gameState.currentLane--;
+        gameState.targetX = LANES[gameState.currentLane];
+        sfx.laneSwitch();
+      }
+    }
+
+    function moveRight() {
+      if (gameState.status !== 'PLAYING') return;
+      if (gameState.currentLane < 2) {
+        gameState.currentLane++;
+        gameState.targetX = LANES[gameState.currentLane];
+        sfx.laneSwitch();
+      }
+    }
+
+    function jump() {
+      if (gameState.status !== 'PLAYING') return;
+      if (!gameState.isJumping) {
+        gameState.isJumping = true;
+        gameState.isSliding = false;
+        gameState.velocityY = 14.5;
+        spawnBurstParticles(playerRig.root.position.x, 0.2, 0, 0xe2e8f0, 6);
+        sfx.jump();
+      }
+    }
+
+    function slide() {
+      if (gameState.status !== 'PLAYING') return;
+      if (gameState.isJumping) {
+        gameState.velocityY = -22;
+      }
+      gameState.isSliding = true;
+      gameState.slideTimer = 0.65;
+      sfx.slide();
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (gameState.status === 'QUIZ' && !gameState.quizLocked) {
+        const key = e.key.toUpperCase();
+        const mapNum = { '1': 'A', '2': 'B', '3': 'C', '4': 'D', '5': 'E' };
+        const chosen = ['A', 'B', 'C', 'D', 'E'].includes(key) ? key : mapNum[key];
+        if (chosen) {
+          e.preventDefault();
+          handleQuizAnswer(chosen);
+        }
+        return;
+      }
+
+      if (gameState.status !== 'PLAYING') return;
+
+      switch (e.key) {
+        case 'ArrowLeft':
+        case 'a':
+        case 'A':
+          e.preventDefault();
+          moveLeft();
+          break;
+        case 'ArrowRight':
+        case 'd':
+        case 'D':
+          e.preventDefault();
+          moveRight();
+          break;
+        case 'ArrowUp':
+        case 'w':
+        case 'W':
+        case ' ':
+          e.preventDefault();
+          jump();
+          break;
+        case 'ArrowDown':
+        case 's':
+        case 'S':
+          e.preventDefault();
+          slide();
+          break;
+      }
+    });
+
+    let touchStartX = 0;
+    let touchStartY = 0;
+    canvas.addEventListener('touchstart', (e) => {
+      if (e.touches.length > 0) {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      }
+    }, { passive: true });
+
+    canvas.addEventListener('touchend', (e) => {
+      if (gameState.status !== 'PLAYING' || e.changedTouches.length === 0) return;
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      const dy = e.changedTouches[0].clientY - touchStartY;
+      if (Math.abs(dx) < 24 && Math.abs(dy) < 24) return;
+
+      if (Math.abs(dx) > Math.abs(dy)) {
+        if (dx > 0) moveRight();
+        else moveLeft();
+      } else {
+        if (dy < 0) jump();
+        else slide();
+      }
+    }, { passive: true });
+
+    document.getElementById('touch-left').addEventListener('click', moveLeft);
+    document.getElementById('touch-right').addEventListener('click', moveRight);
+    document.getElementById('touch-up').addEventListener('click', jump);
+    document.getElementById('touch-down').addEventListener('click', slide);
+
+    /**
+     * =========================================================================
+     * LOGIKA KUIS BAHASA INGGRIS KELAS 12 (HANYA MUNCUL SAAT DAPAT ITEM BUKU)
+     * =========================================================================
+     */
+    const quizModal = document.getElementById('quiz-modal');
+    const quizNumberEl = document.getElementById('quiz-number');
+    const quizTotalLabelEl = document.getElementById('quiz-total-label');
+    const quizDifficultyBadgeEl = document.getElementById('quiz-difficulty-badge');
+    const quizTopicBadgeEl = document.getElementById('quiz-topic-badge');
+    const quizQuestionTextEl = document.getElementById('quiz-question-text');
+    const quizOptionsContainer = document.getElementById('quiz-options-container');
+    const quizFeedbackEl = document.getElementById('quiz-feedback');
+
+    function getDifficultyMeta(diffLevel) {
+      const level = (diffLevel || 'Medium').toLowerCase();
+      if (level === 'easy') {
+        return {
+          label: '⭐ EASY (+250 Poin)',
+          points: 250,
+          coins: 10,
+          classes: 'bg-emerald-100 text-emerald-800 border-emerald-300'
+        };
+      }
+      if (level === 'hard') {
+        return {
+          label: '🔥 HARD / HOTS (+600 Poin)',
+          points: 600,
+          coins: 25,
+          classes: 'bg-rose-100 text-rose-800 border-rose-300'
+        };
+      }
+      return {
+        label: '⚡ MEDIUM (+400 Poin)',
+        points: 400,
+        coins: 15,
+        classes: 'bg-amber-100 text-amber-900 border-amber-300'
+      };
+    }
+
+    function startResumeCountdown() {
+      gameState.status = 'COUNTDOWN';
+      const overlay = document.getElementById('countdown-overlay');
+      const numEl = document.getElementById('countdown-number');
+      let count = 3;
+      numEl.textContent = count;
+      overlay.classList.remove('hidden');
+      sfx.tick();
+
+      const timer = setInterval(() => {
+        count--;
+        if (count > 0) {
+          numEl.textContent = count;
+          sfx.tick();
+        } else {
+          clearInterval(timer);
+          overlay.classList.add('hidden');
+          if (gameState.status === 'COUNTDOWN') {
+            gameState.status = 'PLAYING';
+          }
+        }
+      }, 650);
+    }
+
+    function triggerNextQuiz() {
+      if (gameState.currentQuestionIndex >= gameState.sessionQuestions.length) {
+        finishGame(true);
+        return;
+      }
+
+      gameState.status = 'QUIZ';
+      gameState.quizLocked = false;
+      sfx.quizPop();
+
+      const qObj = gameState.sessionQuestions[gameState.currentQuestionIndex];
+      const totalQ = gameState.sessionQuestions.length;
+      const diffMeta = getDifficultyMeta(qObj.difficulty);
+
+      quizNumberEl.textContent = gameState.currentQuestionIndex + 1;
+      quizTotalLabelEl.textContent = totalQ;
+      quizDifficultyBadgeEl.textContent = diffMeta.label;
+      quizDifficultyBadgeEl.className = `inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-extrabold border ${diffMeta.classes}`;
+      quizTopicBadgeEl.textContent = qObj.topic || 'Grade 12 English';
+      quizQuestionTextEl.textContent = qObj.question;
+      quizFeedbackEl.classList.add('hidden');
+      quizOptionsContainer.innerHTML = '';
+
+      ['A', 'B', 'C', 'D', 'E'].forEach((optKey) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.option = optKey;
+        btn.className = 'quiz-opt-btn w-full text-left px-4 py-2.5 rounded-2xl border-2 border-slate-200 bg-white hover:border-amber-500 hover:bg-amber-50 transition flex items-center gap-3 font-semibold text-xs sm:text-sm text-slate-800 cursor-pointer';
+        btn.innerHTML = `
+          <span class="w-7 h-7 rounded-xl bg-slate-900 text-amber-300 font-game flex items-center justify-center shrink-0 text-xs">${optKey}</span>
+          <span class="flex-1">${qObj.options[optKey] || '-'}</span>
+        `;
+        btn.addEventListener('click', () => handleQuizAnswer(optKey));
+        quizOptionsContainer.appendChild(btn);
+      });
+
+      quizModal.classList.remove('hidden');
+    }
+
+    function handleQuizAnswer(chosenOption) {
+      if (gameState.quizLocked) return;
+      gameState.quizLocked = true;
+
+      const qObj = gameState.sessionQuestions[gameState.currentQuestionIndex];
+      const correctOption = qObj.answer.toUpperCase();
+      const isCorrect = chosenOption === correctOption;
+      const diffMeta = getDifficultyMeta(qObj.difficulty);
+
+      const buttons = quizOptionsContainer.querySelectorAll('.quiz-opt-btn');
+      buttons.forEach(btn => {
+        const opt = btn.dataset.option;
+        btn.disabled = true;
+        if (opt === correctOption) {
+          btn.classList.remove('border-slate-200', 'bg-white');
+          btn.classList.add('border-emerald-500', 'bg-emerald-100', 'text-emerald-950');
+        } else if (opt === chosenOption && !isCorrect) {
+          btn.classList.remove('border-slate-200', 'bg-white');
+          btn.classList.add('border-rose-500', 'bg-rose-100', 'text-rose-950');
+        }
+      });
+
+      quizFeedbackEl.classList.remove('hidden', 'bg-emerald-100', 'text-emerald-800', 'bg-amber-100', 'text-amber-900');
+
+      if (isCorrect) {
+        sfx.correct();
+        gameState.correctCount++;
+        gameState.score += diffMeta.points;
+        gameState.coins += diffMeta.coins;
+        gameState.invulnerableTimer = 4.0;
+        quizFeedbackEl.classList.add('bg-emerald-100', 'text-emerald-800');
+        quizFeedbackEl.textContent = `🎉 EXCELLENT! Jawaban Benar (${qObj.difficulty || 'Medium'})! +${diffMeta.points} Skor, +${diffMeta.coins} Koin & Perisai Kebal 4 Detik!`;
+      } else {
+        sfx.wrong();
+        gameState.invulnerableTimer = 2.5;
+        quizFeedbackEl.classList.add('bg-amber-100', 'text-amber-900');
+        quizFeedbackEl.textContent = `💡 Kurang Tepat! Jawaban yang benar adalah opsi ${correctOption}. Ayo lanjut lari!`;
+      }
+
+      gameState.currentQuestionIndex++;
+      updateHUD();
+
+      setTimeout(() => {
+        quizModal.classList.add('hidden');
+        if (gameState.currentQuestionIndex >= gameState.sessionQuestions.length) {
+          finishGame(true);
+        } else {
+          startResumeCountdown();
+        }
+      }, 1650);
+    }
+
+    /**
+     * =========================================================================
+     * UPDATE HUD, LEADERBOARD & ALUR GAME (MULAI / SELESAI)
+     * =========================================================================
+     */
+    function updateHUD() {
+      document.getElementById('hud-username').textContent = gameState.username || 'Pelari';
+      document.getElementById('hud-char-label').textContent = selectedCharType === 'cewek' ? 'Cewek' : 'Cowok';
+      document.getElementById('hud-avatar-badge').textContent = selectedCharType === 'cewek' ? '👧🏽' : '👦🏽';
+
+      const heartsStr = Array.from({ length: 3 }, (_, i) => (i < gameState.hearts ? '❤️' : '🖤')).join(' ');
+      document.getElementById('hud-hearts').textContent = heartsStr;
+
+      const totalQ = gameState.sessionQuestions.length || 30;
+      document.getElementById('hud-quiz-progress').textContent = gameState.currentQuestionIndex;
+      document.getElementById('hud-quiz-total').textContent = totalQ;
+      const pct = Math.min(100, (gameState.currentQuestionIndex / totalQ) * 100);
+      document.getElementById('hud-quiz-bar').style.width = `${pct}%`;
+
+      document.getElementById('hud-score').textContent = Math.floor(gameState.score).toLocaleString('id-ID');
+      document.getElementById('hud-coins').textContent = gameState.coins;
+
+      const statusBanner = document.getElementById('hud-status-banner');
+      if (gameState.invulnerableTimer > 0) {
+        statusBanner.classList.remove('hidden');
+        statusBanner.textContent = `🛡️ Perisai Kebal Aktif (${gameState.invulnerableTimer.toFixed(1)}s)`;
+      } else {
+        statusBanner.classList.add('hidden');
+      }
+    }
+
+    function saveLeaderboardEntry() {
+      try {
+        const list = JSON.parse(localStorage.getItem(STORAGE_KEYS.LEADERBOARD) || '[]');
+        list.push({
+          username: gameState.username,
+          character: selectedCharType,
+          score: Math.floor(gameState.score),
+          correct: gameState.correctCount,
+          total: gameState.sessionQuestions.length
+        });
+        list.sort((a, b) => b.score - a.score);
+        const top5 = list.slice(0, 5);
+        localStorage.setItem(STORAGE_KEYS.LEADERBOARD, JSON.stringify(top5));
+        renderHomeLeaderboard();
+      } catch (e) {
+        console.warn('Gagal simpan leaderboard:', e);
+      }
+    }
+
+    function renderHomeLeaderboard() {
+      const container = document.getElementById('home-leaderboard');
+      try {
+        const list = JSON.parse(localStorage.getItem(STORAGE_KEYS.LEADERBOARD) || '[]');
+        if (!list.length) {
+          container.innerHTML = '<div class="text-slate-500 italic">Belum ada skor tersimpan.</div>';
+          return;
+        }
+        container.innerHTML = list.slice(0, 3).map((item, idx) => `
+          <div class="flex items-center justify-between text-xs py-0.5">
+            <span class="truncate max-w-[145px]">
+              <strong class="text-amber-400">#${idx + 1}</strong> ${item.character === 'cewek' ? '👧🏽' : '👦🏽'} ${item.username}
+            </span>
+            <span class="font-bold text-white">${item.score.toLocaleString('id-ID')} <span class="text-emerald-400 text-[10px]">(${item.correct}/${item.total})</span></span>
+          </div>
+        `).join('');
+      } catch {
+        container.innerHTML = '<div class="text-slate-500 italic">Belum ada skor tersimpan.</div>';
+      }
+    }
+
+    function startNewGame() {
+      const inputEl = document.getElementById('input-username');
+      const nameVal = inputEl.value.trim();
+      const errEl = document.getElementById('username-error');
+
+      if (!nameVal) {
+        errEl.classList.remove('hidden');
+        inputEl.focus();
+        return;
+      }
+      errEl.classList.add('hidden');
+
+      gameState.username = nameVal;
+      localStorage.setItem(STORAGE_KEYS.USERNAME, nameVal);
+
+      // Acak 30 soal Bahasa Inggris Kelas 12 tanpa pengulangan
+      gameState.sessionQuestions = shuffleArray(questionBank);
+      gameState.currentQuestionIndex = 0;
+      gameState.correctCount = 0;
+
+      gameState.score = 0;
+      gameState.coins = 0;
+      gameState.hearts = 3;
+      gameState.speed = gameState.baseSpeed;
+      gameState.timeSinceLastQuizItem = 8; // Item buku kuis pertama muncul setelah ~8 detik lari pemanasan
+      gameState.invulnerableTimer = 1.8;
+
+      gameState.currentLane = 1;
+      gameState.targetX = 0;
+      gameState.playerY = 0;
+      gameState.velocityY = 0;
+      gameState.isJumping = false;
+      gameState.isSliding = false;
+
+      playerRig.root.position.set(0, 0, 0);
+      clearTrackEntities();
+
+      document.getElementById('home-screen').classList.add('hidden');
+      document.getElementById('end-modal').classList.add('hidden');
+      document.getElementById('quiz-modal').classList.add('hidden');
+      document.getElementById('countdown-overlay').classList.add('hidden');
+      document.getElementById('hud-overlay').classList.remove('hidden');
+
+      gameState.status = 'PLAYING';
+      sfx.init();
+      updateHUD();
+    }
+
+    function finishGame(isVictory) {
+      gameState.status = isVictory ? 'VICTORY' : 'GAMEOVER';
+      saveLeaderboardEntry();
+
+      document.getElementById('hud-overlay').classList.add('hidden');
+      document.getElementById('countdown-overlay').classList.add('hidden');
+      document.getElementById('btn-resume-game').classList.add('hidden');
+
+      const endModal = document.getElementById('end-modal');
+      document.getElementById('end-icon').textContent = isVictory ? '🏆' : '💥';
+      document.getElementById('end-title').textContent = isVictory
+        ? 'CONGRATULATIONS! 30 SOAL TUNTAS!'
+        : 'PERMAINAN BERAKHIR!';
+      document.getElementById('end-subtitle').textContent = isVictory
+        ? `Hebat sekali, ${gameState.username}! Kamu berhasil menyelesaikan semua 30 soal Bahasa Inggris Kelas 12!`
+        : `Tetap semangat, ${gameState.username}! Hindari kendaraan dan kumpulkan Buku Kuis Emas lagi.`;
+
+      document.getElementById('end-score').textContent = Math.floor(gameState.score).toLocaleString('id-ID');
+      document.getElementById('end-correct').textContent = `${gameState.correctCount}/${gameState.sessionQuestions.length}`;
+      document.getElementById('end-coins').textContent = gameState.coins;
+
+      endModal.classList.remove('hidden');
+    }
+
+    /**
+     * =========================================================================
+     * EDITOR ADMIN 30 SOAL (TERSEMBUNYI UNTUK PEMAIN, AKTIF DENGAN ?admin=1)
+     * =========================================================================
+     */
+    const editorModal = document.getElementById('editor-modal');
+    const editorList = document.getElementById('editor-list');
+    const editorToast = document.getElementById('editor-toast');
+
+    if (isAdminMode) {
+      const adminBtn = document.getElementById('btn-open-editor');
+      adminBtn.classList.remove('hidden');
+      adminBtn.classList.add('flex');
+    }
+
+    function showEditorToast(msg) {
+      editorToast.textContent = msg;
+      editorToast.classList.remove('hidden');
+      setTimeout(() => editorToast.classList.add('hidden'), 2400);
+    }
+
+    function renderQuestionEditor() {
+      editorList.innerHTML = '';
+      questionBank.forEach((item, idx) => {
+        const card = document.createElement('div');
+        card.className = 'bg-slate-900/80 border border-white/10 rounded-2xl p-4 space-y-3';
+
+        const optionsHtml = ['A', 'B', 'C', 'D', 'E'].map(optKey => `
+          <div class="flex items-center gap-2">
+            <span class="w-7 h-7 rounded-lg bg-slate-800 text-amber-300 font-bold text-xs flex items-center justify-center shrink-0">${optKey}</span>
+            <input
+              type="text"
+              data-idx="${idx}"
+              data-opt="${optKey}"
+              value="${(item.options[optKey] || '').replace(/"/g, '&quot;')}"
+              class="edit-opt-input flex-1 px-3 py-1.5 rounded-xl bg-slate-800/90 border border-slate-700 focus:border-amber-400 focus:outline-none text-xs sm:text-sm text-white"
+            />
+          </div>
+        `).join('');
+
+        const selectOptionsHtml = ['A', 'B', 'C', 'D', 'E'].map(optKey => `
+          <option value="${optKey}" ${item.answer === optKey ? 'selected' : ''}>Kunci Jawaban: ${optKey}</option>
+        `).join('');
+
+        const diffOptionsHtml = ['Easy', 'Medium', 'Hard'].map(lvl => `
+          <option value="${lvl}" ${(item.difficulty || 'Medium') === lvl ? 'selected' : ''}>Level: ${lvl}</option>
+        `).join('');
+
+        card.innerHTML = `
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <span class="font-game text-amber-400 text-sm">Soal #${idx + 1} (${item.topic || 'English XII'})</span>
+            <div class="flex items-center gap-2">
+              <select data-idx="${idx}" class="edit-diff-select px-2.5 py-1 rounded-xl bg-sky-500/20 border border-sky-400/50 text-sky-300 text-xs font-bold focus:outline-none">
+                ${diffOptionsHtml}
+              </select>
+              <select data-idx="${idx}" class="edit-answer-select px-3 py-1 rounded-xl bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 text-xs font-bold focus:outline-none">
+                ${selectOptionsHtml}
+              </select>
+            </div>
+          </div>
+          <div>
+            <textarea
+              rows="2"
+              data-idx="${idx}"
+              class="edit-q-textarea w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 focus:border-amber-400 focus:outline-none text-xs sm:text-sm text-white font-semibold"
+            >${item.question}</textarea>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            ${optionsHtml}
+          </div>
+        `;
+        editorList.appendChild(card);
+      });
+
+      editorList.querySelectorAll('.edit-diff-select').forEach(el => {
+        el.addEventListener('change', (e) => {
+          const i = Number(e.target.dataset.idx);
+          questionBank[i].difficulty = e.target.value;
+          saveQuestions(questionBank);
+        });
+      });
+
+      editorList.querySelectorAll('.edit-q-textarea').forEach(el => {
+        el.addEventListener('input', (e) => {
+          const i = Number(e.target.dataset.idx);
+          questionBank[i].question = e.target.value;
+          saveQuestions(questionBank);
+        });
+      });
+
+      editorList.querySelectorAll('.edit-opt-input').forEach(el => {
+        el.addEventListener('input', (e) => {
+          const i = Number(e.target.dataset.idx);
+          const opt = e.target.dataset.opt;
+          questionBank[i].options[opt] = e.target.value;
+          saveQuestions(questionBank);
+        });
+      });
+
+      editorList.querySelectorAll('.edit-answer-select').forEach(el => {
+        el.addEventListener('change', (e) => {
+          const i = Number(e.target.dataset.idx);
+          questionBank[i].answer = e.target.value;
+          saveQuestions(questionBank);
+        });
+      });
+    }
+
+    /**
+     * =========================================================================
+     * EVENT LISTENERS UI HOME, PAUSE, EDITOR & KARAKTER
+     * =========================================================================
+     */
+    const usernameInput = document.getElementById('input-username');
+    usernameInput.value = gameState.username;
+    document.getElementById('home-question-count').textContent = questionBank.length;
+
+    function updateCharSelectionUI() {
+      document.querySelectorAll('.char-card').forEach(card => {
+        const isSelected = card.dataset.char === selectedCharType;
+        const badge = card.querySelector('.char-badge');
+        if (isSelected) {
+          card.classList.remove('border-white/15', 'bg-slate-800/60');
+          card.classList.add(
+            selectedCharType === 'cowok' ? 'border-amber-400' : 'border-pink-400',
+            'bg-gradient-to-br',
+            selectedCharType === 'cowok' ? 'from-sky-500/25' : 'from-pink-500/25',
+            selectedCharType === 'cowok' ? 'to-blue-700/25' : 'to-purple-700/25'
+          );
+          badge.classList.remove('hidden');
+        } else {
+          card.className = 'char-card btn-arcade relative rounded-2xl p-3.5 sm:p-4 text-left border-2 border-white/15 bg-slate-800/60 hover:border-amber-400/50 transition cursor-pointer';
+          badge.classList.add('hidden');
+        }
+      });
+    }
+
+    updateCharSelectionUI();
+    renderHomeLeaderboard();
+
+    document.getElementById('select-char-cowok').addEventListener('click', () => {
+      switchPlayerCharacter('cowok');
+      updateCharSelectionUI();
+      sfx.laneSwitch();
+    });
+
+    document.getElementById('select-char-cewek').addEventListener('click', () => {
+      switchPlayerCharacter('cewek');
+      updateCharSelectionUI();
+      sfx.laneSwitch();
+    });
+
+    document.getElementById('btn-start-game').addEventListener('click', startNewGame);
+    usernameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') startNewGame();
+    });
+
+    document.getElementById('btn-open-editor').addEventListener('click', () => {
+      renderQuestionEditor();
+      editorModal.classList.remove('hidden');
+    });
+
+    document.getElementById('btn-close-editor').addEventListener('click', () => {
+      saveQuestions(questionBank);
+      document.getElementById('home-question-count').textContent = questionBank.length;
+      editorModal.classList.add('hidden');
+    });
+
+    document.getElementById('btn-reset-questions').addEventListener('click', () => {
+      questionBank = JSON.parse(JSON.stringify(DEFAULT_QUESTIONS));
+      saveQuestions(questionBank);
+      renderQuestionEditor();
+      showEditorToast('✅ 30 soal Bahasa Inggris Kelas 12 berhasil di-reset!');
+    });
+
+    document.getElementById('btn-export-questions').addEventListener('click', () => {
+      const jsonText = JSON.stringify(questionBank, null, 2);
+      const tempArea = document.createElement('textarea');
+      tempArea.value = jsonText;
+      document.body.appendChild(tempArea);
+      tempArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(tempArea);
+      showEditorToast('📋 JSON 30 soal berhasil disalin ke clipboard!');
+    });
+
+    document.getElementById('btn-toggle-sound').addEventListener('click', (e) => {
+      sfx.muted = !sfx.muted;
+      e.currentTarget.textContent = sfx.muted ? '🔇' : '🔊';
+    });
+
+    document.getElementById('btn-pause-game').addEventListener('click', () => {
+      if (gameState.status !== 'PLAYING') return;
+      gameState.status = 'PAUSED';
+      document.getElementById('end-icon').textContent = '⏸️';
+      document.getElementById('end-title').textContent = 'Permainan Dijeda';
+      document.getElementById('end-subtitle').textContent = 'Istirahat sejenak sebelum melanjutkan lari & mengumpulkan Buku Kuis.';
+      document.getElementById('end-score').textContent = Math.floor(gameState.score).toLocaleString('id-ID');
+      document.getElementById('end-correct').textContent = `${gameState.correctCount}/${gameState.sessionQuestions.length}`;
+      document.getElementById('end-coins').textContent = gameState.coins;
+      document.getElementById('btn-resume-game').classList.remove('hidden');
+      document.getElementById('end-modal').classList.remove('hidden');
+    });
+
+    document.getElementById('btn-resume-game').addEventListener('click', () => {
+      document.getElementById('end-modal').classList.add('hidden');
+      gameState.status = 'PLAYING';
+    });
+
+    document.getElementById('btn-restart-game').addEventListener('click', startNewGame);
+
+    document.getElementById('btn-back-home').addEventListener('click', () => {
+      document.getElementById('end-modal').classList.add('hidden');
+      document.getElementById('hud-overlay').classList.add('hidden');
+      document.getElementById('countdown-overlay').classList.add('hidden');
+      clearTrackEntities();
+      playerRig.root.position.set(0, 0, 0);
+      playerRig.root.visible = true;
+      gameState.status = 'HOME';
+    });
+
+    /**
+     * =========================================================================
+     * LOOP ANIMASI 60FPS & DETEKSI TABRAKAN
+     * =========================================================================
+     */
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), 0.05);
+
+      // Update partikel melayang
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.life -= dt;
+        p.mesh.position.x += p.vx * dt;
+        p.mesh.position.y += p.vy * dt;
+        p.mesh.position.z += p.vz * dt;
+        p.vy -= 14 * dt;
+        p.mesh.scale.setScalar(Math.max(0.01, p.life * 1.8));
+        if (p.life <= 0) {
+          scene.remove(p.mesh);
+          particles.splice(i, 1);
+        }
+      }
+
+      // Gerak awan perlahan
+      clouds.forEach(c => {
+        c.position.x += dt * 0.6;
+        if (c.position.x > 65) c.position.x = -65;
+      });
+
+      // Mode Preview Karakter di Halaman Utama
+      if (gameState.status === 'HOME') {
+        gameState.runAnimTime += dt * 4;
+        playerRig.root.position.set(0, 0, 3.2);
+        playerRig.root.rotation.y = Math.sin(gameState.runAnimTime * 0.4) * 0.45;
+        playerRig.leftLeg.rotation.x = Math.sin(gameState.runAnimTime) * 0.45;
+        playerRig.rightLeg.rotation.x = -Math.sin(gameState.runAnimTime) * 0.45;
+        playerRig.leftArm.rotation.x = -Math.sin(gameState.runAnimTime) * 0.4;
+        playerRig.rightArm.rotation.x = Math.sin(gameState.runAnimTime) * 0.4;
+
+        camera.position.lerp(new THREE.Vector3(0, 3.6, 8.2), dt * 4);
+        camera.lookAt(0, 1.8, 0);
+        renderer.render(scene, camera);
+        return;
+      }
+
+      if (gameState.status !== 'PLAYING') {
+        renderer.render(scene, camera);
+        return;
+      }
+
+      playerRig.root.rotation.y = 0;
+
+      // Kamera mengikuti karakter dengan efek tilt halus saat pindah lajur
+      const targetCamX = playerRig.root.position.x * 0.55;
+      camera.position.lerp(new THREE.Vector3(targetCamX, 6.2, 11.5), dt * 6);
+      camera.lookAt(playerRig.root.position.x * 0.35, 2.0, -10);
+      camera.rotation.z = (playerRig.root.position.x - gameState.targetX) * 0.025;
+
+      // Tingkatkan kecepatan bertahap
+      gameState.speed = Math.min(gameState.maxSpeed, gameState.baseSpeed + gameState.score * 0.0022);
+      const moveDist = gameState.speed * dt;
+      gameState.score += moveDist * 0.65;
+      gameState.timeSinceLastQuizItem += dt;
+
+      // Timer kebal sementara (berkedip saat aktif)
+      if (gameState.invulnerableTimer > 0) {
+        gameState.invulnerableTimer -= dt;
+        playerRig.root.visible = Math.floor(gameState.invulnerableTimer * 14) % 2 === 0;
+      } else {
+        playerRig.root.visible = true;
+      }
+
+      // Gerakan horizontal pindah lajur mulus
+      playerRig.root.position.x += (gameState.targetX - playerRig.root.position.x) * Math.min(1, dt * 15);
+
+      // Fisika Lompat & Gravitasi
+      if (gameState.isJumping) {
+        gameState.playerY += gameState.velocityY * dt;
+        gameState.velocityY -= 36 * dt;
+        if (gameState.playerY <= 0) {
+          gameState.playerY = 0;
+          gameState.velocityY = 0;
+          gameState.isJumping = false;
+          spawnBurstParticles(playerRig.root.position.x, 0.15, 0, 0xcbd5e1, 5);
+        }
+      }
+      playerRig.root.position.y = gameState.playerY;
+
+      // Fisika Slide / Menunduk
+      if (gameState.isSliding) {
+        gameState.slideTimer -= dt;
+        playerRig.bodyPivot.scale.y = 0.52;
+        playerRig.bodyPivot.position.y = 0.55;
+        if (gameState.slideTimer <= 0) {
+          gameState.isSliding = false;
+          playerRig.bodyPivot.scale.y = 1;
+          playerRig.bodyPivot.position.y = 1.05;
+        }
+      } else {
+        playerRig.bodyPivot.scale.y = 1;
+        playerRig.bodyPivot.position.y = 1.05;
+      }
+
+      // Animasi lari tangan & kaki
+      gameState.runAnimTime += dt * (gameState.speed * 0.55);
+      if (!gameState.isJumping) {
+        playerRig.leftLeg.rotation.x = Math.sin(gameState.runAnimTime) * 0.85;
+        playerRig.rightLeg.rotation.x = -Math.sin(gameState.runAnimTime) * 0.85;
+        playerRig.leftArm.rotation.x = -Math.sin(gameState.runAnimTime) * 0.75;
+        playerRig.rightArm.rotation.x = Math.sin(gameState.runAnimTime) * 0.75;
+      } else {
+        playerRig.leftLeg.rotation.x = 0.45;
+        playerRig.rightLeg.rotation.x = -0.35;
+      }
+
+      // Gulir tekstur aspal, marka jalan, zebra cross, kanstin & bangunan kota
+      asphaltTex.offset.y -= moveDist * 0.092;
+      pavingTex.offset.y -= moveDist * 0.21;
+
+      roadStripes.forEach(s => {
+        s.position.z += moveDist;
+        if (s.position.z > 20) s.position.z -= 34 * 7;
+      });
+      zebraCrossings.forEach(zc => {
+        zc.position.z += moveDist;
+        if (zc.position.z > 22) zc.position.z -= 4 * 60;
+      });
+      curbBlocks.forEach(c => {
+        c.position.z += moveDist;
+        if (c.position.z > 20) c.position.z -= 34 * 7;
+      });
+      sceneryProps.forEach(p => {
+        p.position.z += moveDist;
+        if (p.position.z > 24) p.position.z -= 24 * 9.5;
+      });
+
+      // Spawn gelombang rintangan kendaraan
+      spawnTimer -= dt;
+      if (spawnTimer <= 0) {
+        spawnWave();
+        spawnTimer = Math.max(0.84, 1.58 - (gameState.speed - gameState.baseSpeed) * 0.025);
+      }
+
+      const px = playerRig.root.position.x;
+      const py = gameState.playerY;
+      const playerTop = py + (gameState.isSliding ? 1.15 : 2.25);
+
+      // Update & Cek Tabrakan Koin
+      for (let i = activeCoins.length - 1; i >= 0; i--) {
+        const c = activeCoins[i];
+        c.mesh.position.z += moveDist;
+        c.mesh.rotation.z += dt * 4;
+
+        if (
+          Math.abs(c.mesh.position.z) < 1.1 &&
+          Math.abs(c.mesh.position.x - px) < 0.95 &&
+          py < 1.8
+        ) {
+          sfx.coin();
+          gameState.coins += 1;
+          gameState.score += 25;
+          spawnBurstParticles(c.mesh.position.x, c.mesh.position.y, 0, 0xfbbf24, 7);
+          scene.remove(c.mesh);
+          activeCoins.splice(i, 1);
+          continue;
+        }
+
+        if (c.mesh.position.z > 16) {
+          scene.remove(c.mesh);
+          activeCoins.splice(i, 1);
+        }
+      }
+
+      // Update & Cek Tabrakan Item Buku Kuis Emas (SATU-SATUNYA PEMICU SOAL!)
+      for (let i = activeQuizBoxes.length - 1; i >= 0; i--) {
+        const qb = activeQuizBoxes[i];
+        qb.mesh.position.z += moveDist;
+        qb.bookMesh.rotation.y += dt * 2.8;
+        qb.bookMesh.position.y = Math.sin(gameState.runAnimTime * 0.5) * 0.16;
+
+        if (
+          Math.abs(qb.mesh.position.z) < 1.35 &&
+          Math.abs(qb.mesh.position.x - px) < 1.1 &&
+          py < 2.3
+        ) {
+          spawnBurstParticles(qb.mesh.position.x, 1.4, 0, 0x38bdf8, 16);
+          scene.remove(qb.mesh);
+          activeQuizBoxes.splice(i, 1);
+          updateHUD();
+          triggerNextQuiz();
+          return;
+        }
+
+        if (qb.mesh.position.z > 16) {
+          scene.remove(qb.mesh);
+          activeQuizBoxes.splice(i, 1);
+        }
+      }
+
+      // Update & Cek Tabrakan Kendaraan (Motor, Mobil, Bus, Truk, Mobil MBG)
+      for (let i = activeObstacles.length - 1; i >= 0; i--) {
+        const obs = activeObstacles[i];
+        obs.mesh.position.z += moveDist;
+
+        const halfLen = obs.length * 0.46;
+        const zOverlap = Math.abs(obs.mesh.position.z) < halfLen + 0.35;
+        const xOverlap = Math.abs(obs.mesh.position.x - px) < 0.85;
+        const yOverlap = py < obs.height - 0.15 && playerTop > 0.1;
+
+        if (zOverlap && xOverlap && yOverlap) {
+          if (gameState.invulnerableTimer <= 0) {
+            sfx.crash();
+            spawnBurstParticles(px, 1.2, 0, 0xef4444, 14);
+            gameState.hearts = Math.max(0, gameState.hearts - 1);
+            gameState.invulnerableTimer = 2.2;
+            scene.remove(obs.mesh);
+            activeObstacles.splice(i, 1);
+            updateHUD();
+
+            if (gameState.hearts <= 0) {
+              finishGame(false);
+              return;
+            }
+            continue;
+          }
+        }
+
+        if (obs.mesh.position.z > 18) {
+          scene.remove(obs.mesh);
+          activeObstacles.splice(i, 1);
+        }
+      }
+
+      updateHUD();
+      renderer.render(scene, camera);
+    }
+
+    // Responsif saat ukuran layar berubah
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    window.onload = function () {
+      animate();
+    };
+  </script>
+</body>
+</html>
